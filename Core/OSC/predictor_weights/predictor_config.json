@@ -1,0 +1,6 @@
+{
+  "state_dim": 1024,
+  "hidden_dim": 512,
+  "max_guidance": 0.1,
+  "dropout": 0.05
+}

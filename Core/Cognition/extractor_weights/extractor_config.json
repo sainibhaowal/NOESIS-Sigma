@@ -1,0 +1,11 @@
+{
+  "hidden_dim": 256,
+  "text_embed_dim": 128,
+  "content_embed_dim": 128,
+  "max_seq_len": 128,
+  "n_node_types": 6,
+  "n_edge_types": 5,
+  "deq_max_iter": 12,
+  "deq_tol": 0.0001,
+  "dropout": 0.1
+}

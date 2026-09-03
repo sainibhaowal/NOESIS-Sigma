@@ -1,0 +1,78 @@
+### What this single file **tests / benches / checks**
+
+* **Core Unit Tests (CPU & GPU):**
+
+  * `Tests/core/test_params.py` — parameter loading/validation.
+  * `Tests/core/test_icnn.py` — ICNN basics on CPU.
+  * `Tests/core/test_dynamics.py` — full operator-split dynamics (fast marker + full).
+  * `Tests/core/test_icnn_directgrad.py` — GPU direct-grad ICNN path.
+  * `Tests/core/test_dynamics_batched_fused.py` — GPU fused/batched hot path.
+  * `Tests/core/test_core_init.py
+  * `Tests/core/test_kernels_placeholder.py
+
+* **Non-Core Tests:**
+
+  * `Tests/ops` — ops/thermostat, helpers.
+  * `Tests/verifier` — receipts/verification utilities.
+  * `Tests/output` — output/receipt formatting & integrity.
+
+* **Profile Equivalence & Determinism:**
+
+  * FAST / BALANCED **close** checks (HotLoopFused vs HotLoopGraph).
+  * STRICT **bitwise** determinism + **sha256 hash equality** (sets `CUBLAS_WORKSPACE_CONFIG` and deterministic algos).
+
+* **Benchmarks (with logging):**
+
+  * **Fused & Unfused** paths for FAST, BALANCED, STRICT.
+  * Graph capture (`--graph`) vs eager.
+  * Iteration counts adapt to `--quick`.
+
+* **Soak Tests:**
+
+  * 3-minute stability runs (60s with `--quick`) for FAST/BALANCED/STRICT.
+  * Intended to keep **VRAM slope ≈ 0** and watch latency p95 thresholds (printed by your soak script).
+
+* **Receipts Sign/Verify (if keys present):**
+
+  * Uses `Runtime/Config/keys/ed25519_private.pem` and `.../ed25519_public.pem` to create & verify a snapshot receipt.
+
+* **Thermostat Watchdog:**
+
+  * Ensures Thermostat can log alerts to `Runtime/Logs/alerts.log` and the wiring is alive.
+
+* **API Import Smoke:**
+
+  * Confirms `API.main` imports successfully (module initialization).
+
+* **Linters & Types (informational):**
+
+  * `ruff check .` (non-fatal; logs to `ruff.out/err`).
+  * `mypy Core` (non-fatal; logs to `mypy.out/err`).
+  * `types-PyYAML` and `nvidia-ml-py` helper stubs auto-install.
+
+* **Nightly (optional):**
+
+  * `--nightly` adds long-run tests marked `-m nightly -k long_run`.
+
+* **Artifacts & Reporting:**
+
+  * Every suite run writes **separate stdout/stderr files** per task under `Runtime/Logs/testkit_<timestamp>/`.
+  * Final **PASS/FAIL summary** in `summary.txt` + console echo.
+
+### Did we cover “everything” you asked?
+
+✅ Yes — this single script **combines** the subcommand “joystick” with the **logged suite runner**, and covers:
+
+* CPU & GPU unit tests (core + non-core)
+* Fused/unfused micro-benchmarks
+* Graph vs eager comparisons
+* Short soak/stability runs
+* STRICT determinism & hashes
+* Snapshot receipts sign/verify
+* Thermostat watchdog
+* API import smoke
+* Lint + types
+* Nightly long-run opt-in
+* Logging + PASS/FAIL summary bundle
+
+If you later add new tests/benches, just drop them into the relevant folders or add a `logrun "name" ...` line in the **suite_run** section.

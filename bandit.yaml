@@ -1,0 +1,17 @@
+exclude_dirs:
+  - .venv
+  - Runtime
+  - project.wks
+  - .mypy_cache
+  - __pycache__
+  - .git
+skips:
+  - B101  # asserts in non-prod paths
+  - B110  # intentional best-effort guards
+  - B112  # intentional best-effort guards
+  - B307  # eval in verifier DSL (controlled)
+  - B311  # non-crypto RNG in tests/tools
+  - B404  # subprocess in diagnostics/tools
+  - B603  # subprocess in diagnostics/tools
+  - B607  # subprocess with partial path in diagnostics/tools
+  - B614  # torch.load on local artifacts

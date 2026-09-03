@@ -1,0 +1,14 @@
+{
+  "state_dim": 1024,
+  "d_model": 1024,
+  "n_layers": 24,
+  "kernel_size": 7,
+  "prefix_len": 24,
+  "vocab_size": 32768,
+  "max_seq_len": 512,
+  "dropout": 0.0,
+  "retro_alpha": 0.1,
+  "retro_decay": 0.95,
+  "retro_micro_steps": 5,
+  "retro_u_max": 1.0
+}

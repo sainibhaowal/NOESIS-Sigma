@@ -1,0 +1,76 @@
+.git
+.gitignore
+.gitattributes
+
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage*
+htmlcov/
+
+.venv/
+venv/
+ENV/
+
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+Docs/
+Tests/
+Scripts/
+web/
+
+Frontend/
+node_modules/
+**/node_modules/
+**/.next/
+**/.turbo/
+**/dist/
+**/build/
+**/out/
+**/.cache/
+# IDE / Agent / CI Metadata
+.claude/
+.github/
+.vscode/
+.idea/
+
+# Root-level configurations and files (not needed in production container)
+package.json
+package-lock.json
+bandit.yaml
+MANIFEST.in
+next/
+theme.md
+TASK_PROMPT_TEMPLATE.md
+TASK_PROMPT_TEMPLATE (Copy).md
+
+# Databases & SQLite files
+*.db
+*.db-journal
+*.sqlite3
+sim.db
+
+# Utility and helper scripts
+restructure_paper.py
+check_latex_errors.py
+.env*
+
+# Ignore all runtime artifacts except Config and source code to remain 100% future-proof
+Runtime/*
+!Runtime/Config/
+!Runtime/Config/**
+!Runtime/Training/
+!Runtime/Training/**
+!Runtime/LiveLoop/
+!Runtime/LiveLoop/**
+!Runtime/Models/
+!Runtime/Models/**
+Runtime/Config/keys/
+

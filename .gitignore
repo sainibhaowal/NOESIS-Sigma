@@ -1,0 +1,101 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+.env/
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.pyre/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / editor
+.vscode/
+.idea/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Misc
+pip-wheel-metadata/
+
+# Runtime artifacts (repo-local)
+project.wks
+
+# Specific runtime directories to ignore (keeping Config templates/rules versionable)
+Runtime/Logs/
+Runtime/Snapshots/
+Runtime/Jobs/
+Runtime/Backups/
+Runtime/Perception/
+Runtime/Cache/
+Runtime/Data/
+Runtime/LiveLoop/
+Runtime/Models/
+Runtime/Traces/
+Runtime/Training/
+Runtime/Config/keys/
+Runtime/Config/.env
+Runtime/Config/.env.docker
+
+# Ensure templates are tracked
+!Runtime/Config/.env.template
+!Runtime/Config/.env.example
+
+# Large local-only capsules
+model.neo/
+project.sim/
+
+# Checkpoints/bench outputs
+DocsArtifacts/
+
+.nx/installation
+.nx/cache
+.nx/workspace-data
+theme.md
+
+# Databases & Local SQLite
+*.db
+*.db-journal
+*.sqlite3
+sim.db
+
+# Local helper and scratch scripts
+restructure_paper.py
+check_latex_errors.py
+TASK_PROMPT_TEMPLATE (Copy).md
+
+# Excluded documentation and local guides
+Docs/
+Git_Guide.md
+GIT.md
+TASK_PROMPT_TEMPLATE.md
+TASK_PROMPT_TEMPLATE*.md
+
+# Private and research notes
+For Me/
+NOESIS-Sigma.md

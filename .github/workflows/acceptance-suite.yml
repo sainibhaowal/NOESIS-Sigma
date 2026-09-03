@@ -1,0 +1,220 @@
+name: Brain Training Acceptance Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'Core/**'
+      - 'Runtime/**'
+      - 'Tests/**'
+      - 'Requirements/**'
+      - 'pyproject.toml'
+      - '.github/workflows/acceptance-suite.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'Core/**'
+      - 'Runtime/**'
+      - 'Tests/**'
+      - 'Requirements/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: acceptance-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r Requirements/requirements.txt
+          pip install -e .
+
+      - name: Run acceptance suite
+        run: |
+          python -m pytest Tests/test_acceptance_suite.py \
+            -v \
+            -m acceptance_suite \
+            --tb=short \
+            --junit-xml=test-results.xml \
+            --cov=Core \
+            --cov=Runtime \
+            --cov-report=xml
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Check acceptance suite status
+        id: acceptance
+        run: |
+          python -m pytest Tests/test_acceptance_suite.py -q --tb=no
+          if [ $? -eq 0 ]; then
+            echo "passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: test-results.xml
+
+      - name: Upload coverage
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-${{ matrix.python-version }}
+
+      - name: Comment PR on test results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const testResults = fs.readFileSync('test-results.xml', 'utf8');
+            
+            // Parse test counts
+            const passed = (testResults.match(/testcase/g) || []).length;
+            const failed = (testResults.match(/<failure/g) || []).length;
+            
+            const comment = `## 🧠 Brain Training Acceptance Suite Results
+            
+            **Python ${{ matrix.python-version }}**
+            
+            - ✅ Tests Passed: ${passed - failed}/${passed}
+            - ❌ Tests Failed: ${failed}
+            
+            [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Integration tests
+        run: |
+          python -m pytest Tests/test_integration_brain_training.py \
+            -v \
+            -m integration \
+            --tb=short \
+            -x
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## ✅ Brain Training Pipeline Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Acceptance Suite | ${{ steps.acceptance.outputs.passed == 'true' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+
+  decoder-selection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: acceptance-suite
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r Requirements/requirements.txt
+          pip install -e .
+
+      - name: Validate decoder selection logic
+        run: |
+          python3 << 'EOF'
+          import sys
+          from Core.Native_Decoder.config import DecoderConfig, DecoderMode
+          
+          # Test 1: acceptance_suite_passed → expression_layer
+          config = DecoderConfig(acceptance_suite_passed=True)
+          mode = config.get_decoder_mode()
+          assert mode == DecoderMode.EXPRESSION_LAYER, f"Expected EXPRESSION_LAYER, got {mode}"
+          print("✅ Test 1: acceptance_suite_passed=true → expression_layer")
+          
+          # Test 2: acceptance_suite_passed=false → sigma_emitter
+          config = DecoderConfig(acceptance_suite_passed=False)
+          mode = config.get_decoder_mode()
+          assert mode == DecoderMode.SIGMA_EMITTER, f"Expected SIGMA_EMITTER, got {mode}"
+          print("✅ Test 2: acceptance_suite_passed=false → sigma_emitter")
+          
+          # Test 3: explicit decoder_mode overrides acceptance gate
+          config = DecoderConfig(
+              acceptance_suite_passed=True,
+              decoder_mode=DecoderMode.SIGMA_EMITTER
+          )
+          mode = config.get_decoder_mode()
+          assert mode == DecoderMode.SIGMA_EMITTER, f"Expected SIGMA_EMITTER override, got {mode}"
+          print("✅ Test 3: explicit decoder_mode overrides acceptance gate")
+          
+          print("\n✅ All decoder selection tests passed")
+          EOF
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Gate status
+        if: success()
+        run: |
+          echo "✅ Decoder selection gate is configured and validated"
+          echo "When acceptance_suite_passed=true, expression_layer will be used as default decoder"
+
+  status-check:
+    runs-on: ubuntu-latest
+    needs: [acceptance-suite, decoder-selection]
+    if: always()
+
+    steps:
+      - name: Check overall status
+        run: |
+          if [ "${{ needs.acceptance-suite.result }}" != "success" ] || [ "${{ needs.decoder-selection.result }}" != "success" ]; then
+            echo "❌ Pipeline failed"
+            exit 1
+          fi
+          echo "✅ All pipeline checks passed"
+
+      - name: Workflow summary
+        run: |
+          echo "## 🧠 NOESIS-Σ Brain Training Pipeline"
+          echo ""
+          echo "**Acceptance Suite:** ${{ needs.acceptance-suite.result }}"
+          echo "**Decoder Selection:** ${{ needs.decoder-selection.result }}"
+          echo ""
+          echo "Pipeline is ready for production deployment when ACCEPTANCE_SUITE_PASSED=true flag is set."

@@ -1,0 +1,4 @@
+{"request":"[sim] my project notes","policy_mode":"BALANCED","expected_route_kind":"SIM"}
+{"request":"[wks] what is the capital of france","policy_mode":"BALANCED","expected_route_kind":"WKS"}
+{"request":"[merge] my project and what is the capital of france","policy_mode":"BALANCED","expected_route_kind":"MERGE"}
+{"request":"[no_wks] my private notes only","policy_mode":"STRICT","expected_route_kind":"BLOCK"}
