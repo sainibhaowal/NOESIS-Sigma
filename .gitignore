@@ -62,6 +62,5 @@ docs/paper/*.pdf
 docs/paper/*.synctex.gz
 docs/paper/*.toc
 
-# Kaggle outputs are generated; kernel sources and metadata remain tracked
-kaggle/**/output/
-kaggle/**/runs/
+# Kaggle kernels, metadata, outputs, and runs stay local and are never published
+kaggle/
