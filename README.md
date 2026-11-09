@@ -1,25 +1,5 @@
 <div align="center">
-
-<table width="100%" cellpadding="18" cellspacing="0" border="0">
-  <tr>
-    <td width="27%" align="center" bgcolor="#0B1020">
-      <img src="assets/logo.png" alt="NOESIS-Σ logo" width="190">
-    </td>
-    <td align="left" bgcolor="#0B1020">
-      <h1>NOESIS-Σ</h1>
-      <p><strong>Bounded-state sequence modeling without dense token-to-token attention.</strong></p>
-      <p>A research implementation of the SigmaStorm transition law: fixed-size recurrent state,
-      linear-time memory paths, and a bounded latent updated by learned operators.</p>
-      <p><code>constant state</code> &nbsp;·&nbsp; <code>linear-time paths</code> &nbsp;·&nbsp; <code>PyTorch prototype</code></p>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center" bgcolor="#121B34">
-      <strong>Research status:</strong> mechanism-level gates are documented; frontier-scale quality is not claimed.
-    </td>
-  </tr>
-</table>
-
+  <img src="assets/noesis-sigma-banner.svg" alt="NOESIS-Σ bounded-state sequence modeling banner" width="100%">
 </div>
 
 > **Naming:** NOESIS-Σ is the project. **SigmaStorm** is the current executable model and package
@@ -180,7 +160,8 @@ configs/            tiny, MQAR, 20M, and 100M presets
 tests/              equivalence, state, boundedness, gradient, and recall tests
 results/            recorded gates, ablations, and training runs
 docs/               roadmap, Kaggle instructions, findings, and technical report
-assets/logo.png     project mark used in this README banner
+assets/logo.png     source project mark
+assets/noesis-sigma-banner.svg  rounded SVG banner used at the top of this README
 ~~~
 
 ## Three details that make recall learn

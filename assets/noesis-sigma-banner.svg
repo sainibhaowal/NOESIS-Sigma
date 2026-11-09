@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="1280" height="400" viewBox="0 0 1280 400" role="img"
+     aria-labelledby="title desc">
+  <title id="title">NOESIS-Σ — bounded-state sequence modeling</title>
+  <desc id="desc">A neon SigmaStorm logo beside the project title, model description, capabilities, and research motto.</desc>
+
+  <defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="0.55" stop-color="#111a31"/>
+      <stop offset="1" stop-color="#17112d"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#55e6ff"/>
+      <stop offset="0.52" stop-color="#768dff"/>
+      <stop offset="1" stop-color="#d763ff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#62ebff"/>
+      <stop offset="1" stop-color="#c77dff"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#39d9ff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#39d9ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="clip-card">
+      <rect x="8" y="8" width="1264" height="384" rx="38"/>
+    </clipPath>
+  </defs>
+
+  <rect x="8" y="8" width="1264" height="384" rx="38" fill="url(#surface)" stroke="url(#edge)" stroke-width="2"/>
+  <g clip-path="url(#clip-card)">
+    <circle cx="1110" cy="38" r="220" fill="url(#orb)"/>
+    <circle cx="180" cy="382" r="220" fill="#6a3dff" opacity="0.08"/>
+    <path d="M0 314 C235 248 350 350 565 290 S958 211 1280 263" fill="none" stroke="#61e9ff" stroke-opacity="0.08" stroke-width="2"/>
+    <path d="M0 332 C235 266 350 368 565 308 S958 229 1280 281" fill="none" stroke="#ca78ff" stroke-opacity="0.08" stroke-width="2"/>
+  </g>
+
+  <rect x="32" y="32" width="302" height="336" rx="28" fill="#080d1b" fill-opacity="0.55" stroke="#5a78a4" stroke-opacity="0.36"/>
+  <rect x="48" y="48" width="270" height="304" rx="22" fill="none" stroke="url(#edge)" stroke-opacity="0.18"/>
+  <circle cx="183" cy="193" r="132" fill="url(#orb)" opacity="0.55"/>
+  <image x="66" y="70" width="234" height="234" preserveAspectRatio="xMidYMid meet" href="logo.png" xlink:href="logo.png" filter="url(#soft-glow)"/>
+  <text x="183" y="336" text-anchor="middle" fill="#91a8c8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" letter-spacing="3">SIGMASTORM / NOESIS</text>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="382" y="74" fill="#76eaff" font-size="13" font-weight="700" letter-spacing="3">NOESIS-Σ  ·  RESEARCH PROTOTYPE</text>
+    <text x="380" y="132" fill="#f4f7ff" font-size="48" font-weight="800" letter-spacing="-1">Bounded-state sequence</text>
+    <text x="380" y="184" fill="#f4f7ff" font-size="48" font-weight="800" letter-spacing="-1">modeling beyond dense attention</text>
+    <rect x="382" y="208" width="92" height="4" rx="2" fill="url(#accent)"/>
+
+    <text x="380" y="248" fill="#c7d4e9" font-size="18">Fixed-size recurrent state · linear-time memory paths</text>
+    <text x="380" y="276" fill="#c7d4e9" font-size="18">No global T² attention · PyTorch implementation</text>
+
+    <g transform="translate(380 304)">
+      <rect width="178" height="34" rx="17" fill="#172843" stroke="#385779"/>
+      <text x="89" y="22" text-anchor="middle" fill="#aeefff" font-size="12" font-weight="700" letter-spacing="1">CONSTANT STATE</text>
+      <rect x="190" width="190" height="34" rx="17" fill="#1d2041" stroke="#514b86"/>
+      <text x="285" y="22" text-anchor="middle" fill="#d9c7ff" font-size="12" font-weight="700" letter-spacing="1">LINEAR-TIME PATHS</text>
+      <rect x="392" width="184" height="34" rx="17" fill="#281a3b" stroke="#754b8c"/>
+      <text x="484" y="22" text-anchor="middle" fill="#f0c9ff" font-size="12" font-weight="700" letter-spacing="1">BOUNDED LATENT</text>
+    </g>
+
+    <text x="380" y="369" fill="#8197b6" font-size="14" font-style="italic">“Bounded state. Persistent memory. Measurable claims.”</text>
+  </g>
+</svg>
