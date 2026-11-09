@@ -1,0 +1,4 @@
+torch>=2.3
+numpy>=1.24
+# corpus building (scripts/build_corpus.py); `datasets` is only needed for --source tinystories
+tokenizers>=0.15

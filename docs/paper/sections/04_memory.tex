@@ -1,0 +1,198 @@
+\section{Structured memory operators}
+\label{sec:memory}
+
+\subsection{The delta rule: associative recall}
+\label{sec:delta}
+
+Per head, with $a_t=\exp(g_t)$ and $b_t=\sigma(\beta_t)$,
+\begin{equation}
+\label{eq:delta-seq}
+S_t=a_t S_{t-1}+b_t\,k_t\big(v_t-a_t k_t^\top S_{t-1}\big)^\top,
+\qquad o_t=q_t^\top S_t .
+\end{equation}
+The term $(v_t-a_t k_t^\top S_{t-1})$ is error correction: the state is rewritten only by the
+part of the value it does not already predict. This is what makes a repeated key overwrite its
+binding instead of averaging all values ever seen with that key.
+
+For training, the recurrence is evaluated in chunks of 64 tokens:
+\begin{align}
+A[i,j]&=\exp(g_i-g_j)\,b_j\,(k_i\!\cdot\!k_j), \quad j<i,\\
+r&=(I+A)^{-1}\big(V-\exp(g)\odot K S_0\big),\\
+O&=\exp(g)\odot Q S_0+\operatorname{tril}\!\big(\exp(g_i-g_j)b_j(q_i\!\cdot\!k_j)\big)\,r,\\
+S_C&=\exp(g_{\mathrm{last}})S_0+\big(\exp(g_{\mathrm{last}}-g_j)b_jK\big)^\top r .
+\end{align}
+Every ratio on the causal region is at most one, so the chunkwise form cannot overflow. A
+falsification gate compares it to the token-by-token reference and measures a maximum output
+difference of $4.17\times10^{-7}$ (\Cref{tab:gates}).
+
+\subsubsection{Decay spectrum (Gap A)}
+\label{sec:gap-a-method}
+A single decay rate gives the model one timescale: it must either forget local context quickly
+or forget long-range bindings slowly, and it cannot do both. Each head therefore starts at its
+own log-spaced rate,
+\begin{equation}
+\label{eq:spectrum}
+\begin{aligned}
+\mathrm{rate}_h&=r_{\min}\Big(\frac{r_{\max}}{r_{\min}}\Big)^{h/(H-1)},\\
+\mathrm{bias}_h&=\log\!\big(\exp(\mathrm{rate}_h)-1\big),
+\end{aligned}
+\end{equation}
+with $r_{\min}=10^{-4}$ and $r_{\max}=3\times10^{-2}$, i.e.\ $\alpha\approx0.9999$ down to
+$0.970$. The projection weight is zero at initialisation, so these are exactly the initial
+rates, and every rate remains a learned, token-dependent function. The initialiser protects the
+bias from the generic zero-initialisation pass (invariant 2 in \Cref{sec:method}). The result
+is a multiscale memory at step zero: some heads can hold a binding for the whole sequence,
+others track the last few dozen tokens.
+
+\subsection{State expansion (Gap B)}
+\label{sec:gap-b-method}
+\texttt{state\_expand}$=k$ multiplies the number of independent delta states without shrinking
+each head:
+\begin{equation}
+\begin{aligned}
+q,k,v&: d\to k\,d,\\
+S&:[Hk,\,d_h,\,d_h],\qquad \text{output}: k\,d\to d,
+\end{aligned}
+\end{equation}
+with $d_h=d/H$. Capacity and cost grow linearly, and unlike widening $d_h$ this does not reduce
+the number of retrieval directions per token. The decay spectrum is laid out over all $Hk$
+heads, so the extra states also add timescales. The \emph{capacity} benefit is not demonstrated
+at the scale tested (\Cref{sec:results-gap-bc}); the mechanism is implemented and the state
+remains constant in $T$.
+
+\subsection{Slot memory: gated writes and a gated read (Gap D)}
+\label{sec:slot}
+
+A fixed ring of prototypes $K_j,V_j$ ($j=1\ldots n_s$) is updated per token. Routing is a
+load-balanced soft assignment,
+\begin{equation}
+\label{eq:route}
+a_{tj}=\softmax_j\!\Big(\frac{k_t\!\cdot\!K_j-\lambda\log(1+W_j)}{\tau_w}\Big),
+\end{equation}
+where $W_j$ is the causal write mass in the current block and $\lambda=1$ penalises routing
+into an already-loaded slot. Without the penalty, sharp routing sends every similar token to
+the same slot and the ring collapses to one prototype.
+
+\paragraph{Write gate.}
+Both novelty and evidence gate the write:
+\begin{equation}
+\label{eq:write-gate}
+g_t=\Big[\frac{\nu_t-\delta}{1-\delta}\Big]_{+}\,e_t,
+\qquad
+\nu_t=1-\max_j\cos(k_t,K_j),
+\end{equation}
+where $\delta$ is the novelty floor and $[\cdot]_+=\max(\cdot,0)$. Novelty is computed twice:
+first against the consolidated prototypes, then causally against writes earlier in the same
+block. The second pass suppresses a repeated filler on its second occurrence instead of
+flooding the accumulator. The floor is a dead-zone, not a damping heuristic: below $\delta$ the
+write weight is exactly zero, so a repeated token cannot leak into every slot, and above
+$\delta$ the gradient is unchanged.
+
+\paragraph{Consolidation.}
+Writes accumulate for \texttt{slot\_block} tokens and are consolidated with a Bayesian weight
+\begin{equation}
+\label{eq:consolidate}
+D_j=\sum_t g_t a_{tj},\quad \eta_j=\frac{D_j}{D_j+1},
+\end{equation}
+\begin{equation}
+\begin{aligned}
+V_j&\leftarrow(1-\eta_j)V_j+\eta_j\frac{\sum_t g_t a_{tj}v_t}{D_j},\\
+K_j&\leftarrow\mathrm{normalize}\!\Big((1-\eta_j)K_j\\
+&\qquad+\eta_j\,\mathrm{normalize}\big(\textstyle\sum_t g_ta_{tj}k_t/D_j\big)\Big),\\
+u_j&\leftarrow(1-\eta_j)u_j+\eta_j .
+\end{aligned}
+\end{equation}
+One confident token moves a slot slightly; a block of agreeing tokens replaces it. The
+accumulator, token counter, and ring are carried in the state, so the operator is exactly
+chunk-invariant for any boundary.
+
+\paragraph{Read gate.}
+A softmax always hands out unit mass, so a query that matches nothing still receives a
+full-scale average of every slot. The first version of this operator was therefore diffuse:
+in a trained checkpoint the per-block read entropy was $3.03$--$3.16$ nats against
+$\ln 24=3.178$, and zeroing the memory cost only $+0.035$ nats. Three changes turn the read
+into a gated address:
+\begin{equation}
+\label{eq:read}
+\begin{aligned}
+m_t&=\max_{j:\,u_j>10^{-3}}\cos(q_t,K_j),\\
+c_t&=\sigma\!\big(\kappa\,(m_t-\theta)\big),\\
+\mathrm{read}_t&=c_t\,W_o\sum_j\softmax_j\!\big(s_{tj}/\tau_r\big)V_j,
+\end{aligned}
+\end{equation}
+where $s_{tj}=q_t\!\cdot\!K_j$ is computed \emph{before} the usage bias, and $\kappa,\theta$ are
+learned scalars. The separate read temperature $\tau_r$ is not the routing temperature: a read
+that is sharp before addresses are trained picks an arbitrary slot. The confidence factor is a
+differentiable abstention path: unmatched queries contribute zero and the residual stream alone
+answers them. \Cref{fig:slot} shows the two paths. All three changes are opt-in
+(\texttt{memory\_novelty\_floor}, \texttt{memory\_read\_temperature},
+\texttt{memory\_abstain}); the defaults preserve the previous behaviour and existing
+checkpoints load unchanged.
+
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\footnotesize, >=Latex, node distance=3.2mm and 3.5mm,
+  b/.style={draw=sigmaBlue!75, rounded corners=1.5pt, fill=lightBlue, align=center,
+            minimum height=5.6mm, minimum width=13mm},
+  g/.style={draw=sigmaOrange!90, rounded corners=1.5pt, fill=lightOrange, align=center,
+            minimum height=5.6mm, minimum width=13mm},
+  m/.style={draw=sigmaTeal!80, rounded corners=1.5pt, fill=lightTeal, align=center,
+            minimum height=5.6mm, minimum width=13mm},
+  a/.style={->, thick, draw=black!70}
+]
+\node[b] (k) {$k_t$};
+\node[b, right=of k] (route) {softmax\\ routing};
+\node[g, right=of route] (gate) {novelty\\ dead-zone};
+\node[m, right=of gate] (acc) {write\\ accumulators};
+\node[m, right=of acc] (cons) {Bayesian\\ consolidation};
+\node[m, below=6mm of cons] (ring) {prototype\\ ring $K_j,V_j$};
+\draw[a] (k) -- (route);
+\draw[a] (route) -- (gate);
+\draw[a] (gate) -- (acc);
+\draw[a] (acc) -- (cons);
+\draw[a] (cons) -- (ring);
+
+\node[b, below=14mm of k] (q) {$q_t$};
+\node[b, right=of q] (scores) {match\\ $\max_j\cos$};
+\node[g, right=of scores] (conf) {$\sigma(\kappa(m-\theta))$};
+\node[m, right=of conf] (soft) {$\softmax(s/\tau_r)$};
+\node[m, right=of soft] (read) {$\sum_j w_jV_j$};
+\node[b, right=of read] (out) {$c_t\,W_o$};
+\draw[a] (q) -- (scores);
+\draw[a] (scores) -- (conf);
+\draw[a] (conf) -- (soft);
+\draw[a] (soft) -- (read);
+\draw[a] (read) -- (out);
+\draw[a, dashed] (ring.south west) -- (soft.north east);
+\node[align=left, font=\scriptsize, below=2mm of route] {write path};
+\node[align=left, font=\scriptsize, below=2mm of scores, xshift=2mm] {read path (abstains when $m_t$ is small)};
+\end{tikzpicture}}
+\caption{Slot memory with per-token gated writes (top) and a gated read (bottom). The write
+path applies a novelty dead-zone before the accumulator; the read path multiplies the address
+distribution by a learned match-confidence factor, so an unmatched query contributes zero.}
+\label{fig:slot}
+\end{figure*}
+
+\subsection{Chunk summaries: a global path without $T^2$ (Gap C)}
+\label{sec:summary}
+
+Every \texttt{summary\_chunk} tokens, one pooled summary is written to a fixed ring of
+\texttt{summary\_slots}:
+\begin{equation}
+\label{eq:summary}
+\begin{aligned}
+p_c&=\frac1C\sum_{t\in c}x_t,\\
+K_c&=\frac{\mathrm{normalize}(W_kp_c)}{\sqrt{d_h}},\qquad
+V_c=\frac{W_vp_c}{\sqrt{d_h}},\\
+\mathrm{score}_{tc}&=q_t\!\cdot\!K_c\\
+&\qquad-\mathrm{softplus}(\gamma)\,(t_c^{\mathrm{idx}}-\mathrm{pos}_c),\\
+o_t&=W_o\sum_c\softmax_c(\mathrm{score}_{tc})\,V_c .
+\end{aligned}
+\end{equation}
+Cost is $O(TS\,d)$, state is constant, and the age bias is learned per head, so a summary can
+stay addressable for the whole sequence or fade. Only completed chunks are written; the
+partial-chunk accumulator is carried in the state, which makes the operator chunk-invariant.
+This is the only path that gives every token a global, non-decaying view without a $T^2$
+matrix. Its measured benefit is discussed honestly in \Cref{sec:results-gap-bc}.

@@ -1,0 +1,250 @@
+{
+  "date": "2026-11-06",
+  "device": "cpu",
+  "note": "Kaggle weekly GPU quota (30 h) exhausted; all arms re-run on CPU with identical data, seeds, optimizer and steps.",
+  "mechanism": {
+    "novelty_floor": 0.1,
+    "read_temperature": 0.1,
+    "abstain": true
+  },
+  "presence": {
+    "steps": 800,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "runs": {
+      "cosine": [
+        {
+          "seed": 0,
+          "accuracy": 0.5625,
+          "train_s": 56.5,
+          "read_entropy_nats": 1.2595097720623016,
+          "read_entropy_uniform": 2.7725887298583984,
+          "mean_top_weight": 0.6081983298063278,
+          "cross_slot_key_cosine": 0.02293536439538002,
+          "ce_nats": 0.6633819080889225,
+          "ablation_delta_nats": 0.14666549488902092
+        },
+        {
+          "seed": 1,
+          "accuracy": 0.5390625,
+          "train_s": 54.8
+        },
+        {
+          "seed": 2,
+          "accuracy": 0.5546875,
+          "train_s": 56.4
+        }
+      ],
+      "whitened": [
+        {
+          "seed": 0,
+          "accuracy": 0.6484375,
+          "train_s": 59.9,
+          "read_entropy_nats": 0.7245861068367958,
+          "read_entropy_uniform": 2.7725887298583984,
+          "mean_top_weight": 0.7884694635868073,
+          "cross_slot_key_cosine": -0.04388244450092316,
+          "ce_nats": 0.5167317315936089,
+          "ablation_delta_nats": 0.21731238812208176
+        },
+        {
+          "seed": 1,
+          "accuracy": 0.53125,
+          "train_s": 60.6
+        },
+        {
+          "seed": 2,
+          "accuracy": 0.5390625,
+          "train_s": 60.2
+        }
+      ],
+      "gated": [
+        {
+          "seed": 0,
+          "accuracy": 0.9765625,
+          "train_s": 57.1,
+          "read_entropy_nats": 0.4132460980670203,
+          "read_entropy_uniform": 2.7725887298583984,
+          "mean_top_weight": 0.8198216259479523,
+          "cross_slot_key_cosine": 0.00423981249332428,
+          "ce_nats": 0.019132320361677557,
+          "ablation_delta_nats": 2.2550760316080414,
+          "confidence_present": 0.5623522400856018,
+          "confidence_absent": 0.02630442939698696
+        },
+        {
+          "seed": 1,
+          "accuracy": 1.0,
+          "train_s": 57.6
+        },
+        {
+          "seed": 2,
+          "accuracy": 0.953125,
+          "train_s": 56.9
+        }
+      ]
+    },
+    "diagnostics_seed0": {
+      "cosine": {
+        "read_entropy_nats": 1.2595097720623016,
+        "read_entropy_uniform": 2.7725887298583984,
+        "mean_top_weight": 0.6081983298063278,
+        "cross_slot_key_cosine": 0.02293536439538002,
+        "ce_nats": 0.6633819080889225,
+        "ablation_delta_nats": 0.14666549488902092
+      },
+      "whitened": {
+        "read_entropy_nats": 0.7245861068367958,
+        "read_entropy_uniform": 2.7725887298583984,
+        "mean_top_weight": 0.7884694635868073,
+        "cross_slot_key_cosine": -0.04388244450092316,
+        "ce_nats": 0.5167317315936089,
+        "ablation_delta_nats": 0.21731238812208176
+      },
+      "gated": {
+        "read_entropy_nats": 0.4132460980670203,
+        "read_entropy_uniform": 2.7725887298583984,
+        "mean_top_weight": 0.8198216259479523,
+        "cross_slot_key_cosine": 0.00423981249332428,
+        "ce_nats": 0.019132320361677557,
+        "ablation_delta_nats": 2.2550760316080414,
+        "confidence_present": 0.5623522400856018,
+        "confidence_absent": 0.02630442939698696
+      }
+    }
+  },
+  "mqar": {
+    "steps": 400,
+    "seeds": [
+      0,
+      1
+    ],
+    "runs": {
+      "cosine": [
+        {
+          "seed": 0,
+          "accuracy": 0.98828125,
+          "train_s": 60.1
+        },
+        {
+          "seed": 1,
+          "accuracy": 0.9794921875,
+          "train_s": 64.5
+        }
+      ],
+      "whitened": [
+        {
+          "seed": 0,
+          "accuracy": 0.98828125,
+          "train_s": 63.4
+        },
+        {
+          "seed": 1,
+          "accuracy": 0.9794921875,
+          "train_s": 63.1
+        }
+      ],
+      "gated": [
+        {
+          "seed": 0,
+          "accuracy": 0.990234375,
+          "train_s": 63.5
+        },
+        {
+          "seed": 1,
+          "accuracy": 0.9873046875,
+          "train_s": 64.0
+        }
+      ]
+    }
+  },
+  "aggregate": {
+    "steps": 600,
+    "seeds": [
+      0,
+      1
+    ],
+    "runs": {
+      "cosine": [
+        {
+          "seed": 0,
+          "accuracy": 0.6796875,
+          "train_s": 226.0
+        },
+        {
+          "seed": 1,
+          "accuracy": 1.0,
+          "train_s": 253.3
+        }
+      ],
+      "whitened": [
+        {
+          "seed": 0,
+          "accuracy": 0.671875,
+          "train_s": 268.0
+        },
+        {
+          "seed": 1,
+          "accuracy": 0.71875,
+          "train_s": 268.9
+        }
+      ],
+      "gated": [
+        {
+          "seed": 0,
+          "accuracy": 0.8359375,
+          "train_s": 221.0
+        },
+        {
+          "seed": 1,
+          "accuracy": 0.859375,
+          "train_s": 223.2
+        }
+      ]
+    }
+  },
+  "lm_real_data": {
+    "model": "tiny preset, vocab 8192, batch 8, seq 256, 600 steps, identical stream",
+    "baseline": {
+      "val_ce": 3.0759811848402023,
+      "train_curve": [
+        [
+          200,
+          4.278632640838623
+        ],
+        [
+          400,
+          3.4065747261047363
+        ],
+        [
+          600,
+          3.030043363571167
+        ]
+      ],
+      "params": 3059423,
+      "seconds": 321.9
+    },
+    "gated": {
+      "val_ce": 3.0825978070497513,
+      "train_curve": [
+        [
+          200,
+          4.274531364440918
+        ],
+        [
+          400,
+          3.410524845123291
+        ],
+        [
+          600,
+          3.0431485176086426
+        ]
+      ],
+      "params": 3059431,
+      "seconds": 318.6
+    }
+  }
+}

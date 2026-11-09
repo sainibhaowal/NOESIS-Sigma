@@ -1,0 +1,139 @@
+\appendix
+
+\section{Configurations}
+\label{app:configs}
+
+All experiments use \texttt{SigmaConfig} from \texttt{sigmastorm/config.py}. Unknown fields
+are rejected at load time, so a checkpoint cannot silently acquire new behaviour. \Cref{tab:presets}
+lists the two presets used in this report; values not shown take their dataclass defaults
+(\Cref{tab:defaults}). Task-specific overrides are limited to batch size, step count, sequence
+length, and the operator switches named in the text.
+
+\begin{center}
+\small
+\captionof{table}{Presets used in this report. The 21M language-model run uses the \texttt{20m}
+preset with \texttt{state\_expand}=2, 24 slots, and 32 summary slots.}
+\label{tab:presets}
+\begin{tabularx}{\textwidth}{@{}l r r X@{}}
+\toprule
+Field & \texttt{tiny} & \texttt{20m} & Role \\
+\midrule
+\texttt{vocab\_size} & 512 & 8{,}192 & byte-level BPE (8K) for TinyStories \\
+\texttt{d\_model} & 128 & 320 & residual width \\
+\texttt{n\_blocks} & 4 & 6 & depth \\
+\texttt{n\_heads} & 4 & 8 & delta-rule heads before expansion \\
+\texttt{slot\_count} & 16 & 24 & prototype ring size \\
+\texttt{window} & 64 & 128 & window-attention length \\
+\texttt{state\_expand} & 2 & 2 & independent delta states per head \\
+\texttt{summary\_chunk} & 32 & 128 & tokens per pooled summary \\
+\texttt{summary\_slots} & 16 & 32 & summary ring size \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{center}
+\small
+\captionof{table}{Selected defaults shared by both presets.}
+\label{tab:defaults}
+\begin{tabularx}{\textwidth}{@{}l r X@{}}
+\toprule
+Field & Value & Note \\
+\midrule
+\texttt{chunk\_size} & 64 & chunkwise delta solve \\
+\texttt{conv\_kernel} & 4 & short convolution width \\
+\texttt{slot\_block} & 64 & consolidation block \\
+\texttt{slot\_temperature} & 0.5 & routing temperature \\
+\texttt{local\_attn\_every} & 4 & one window block in four \\
+\texttt{summary\_every} & 2 & one summary block in two \\
+\texttt{ffn\_mult} & 2.67 & FFN expansion \\
+\texttt{max\_norm} $R$ & 16 & projection radius \\
+\texttt{dt} & 0.5 & base step size \\
+\texttt{energy\_rank} & 32 & low-rank energy factor \\
+\texttt{energy\_floor} & $10^{-2}$ & diagonal energy floor \\
+\texttt{decay\_min\_rate} & $10^{-4}$ & slowest initial rate \\
+\texttt{decay\_max\_rate} & $3\times10^{-2}$ & fastest initial rate \\
+\texttt{mtp\_horizons} & $(2,4)$ & multi-token prediction offsets \\
+\texttt{loss\_token\_chunk} & 256 & chunked LM-loss slice \\
+\texttt{tie\_embeddings} & true & input/output embedding tie \\
+\texttt{dropout} & 0.0 & no dropout in reported runs \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+The Gap~D switches are opt-in and default to the previous behaviour:
+\texttt{memory\_novelty\_floor} $=0$, \texttt{memory\_read\_temperature} $=$ \texttt{None}, and
+\texttt{memory\_abstain} $=$ false. The shipped gated configuration sets a positive novelty
+floor, a read temperature separate from the routing temperature, and
+\texttt{memory\_abstain} $=$ true. Existing checkpoints load unchanged because the defaults
+reproduce the old operator.
+
+\section{Reproduction}
+\label{app:repro}
+
+All commands run from the repository root with the project virtual environment
+(\texttt{.venv/bin/python}, CPU build is sufficient for the mechanism experiments). The
+falsification gates and unit tests are the first check and should pass before any result is
+cited.
+
+{\small
+\begin{verbatim}
+.venv/bin/python scripts/gate.py
+.venv/bin/python -m pytest -q tests
+.venv/bin/python scripts/ladder.py \
+    --out results/ladder.json
+.venv/bin/python scripts/gapd_proof.py \
+    --out results/gapd_proof.json
+\end{verbatim}
+}
+
+The Gap~D proof script runs the three arms (cosine, ZCA-whitened, gated) on the presence task
+for seeds 0--2 at 800 steps, then the MQAR and aggregate no-regression controls. The 21M
+language-model run is reproduced by the training script with the \texttt{20m} preset and
+TinyStories; it requires two 16\,GB T4 GPUs in the reported configuration. Raw artifacts:
+\texttt{results/ladder.\{json,md\}}, \texttt{results/gapd\_proof.\{json,md\}}, and
+\texttt{results/20m\_tinystories.md}.
+
+\section{Honesty ledger}
+\label{app:ledger}
+
+This appendix records experiments that failed, were invalidated, or changed sign. They are part
+of the evidence: a report that only lists what worked is not a record of what was learned.
+
+\begin{center}
+\small
+\captionof{table}{Honesty ledger. ``Invalidated'' means the first version of the experiment did
+not measure what it claimed; the corrected version is the one reported in the body.}
+\label{tab:ledger}
+\begin{tabularx}{\textwidth}{@{}p{0.20\textwidth} X p{0.14\textwidth}@{}}
+\toprule
+Experiment & What happened & Status in body \\
+\midrule
+Gap A, first version & Decay bias left trainable. A single-rate model learned its own spectrum and
+the ablation showed no difference. The comparison measured training, not the initialised prior. & Invalidated; frozen-bias version reported \\
+Gap B, state expansion & Intended to add capacity; at 66 bindings it reduced accuracy from $0.754$
+to $0.555$. Optimisation and interference are not separated. & Negative result reported \\
+Gap C, summaries & First run: $0.797$ with summaries vs.\ $0.891$ without, i.e.\ the opposite sign.
+Second run: $0.703$ vs.\ $0.672$. Both are within seed noise. & Inconclusive; not adopted \\
+Gap D, whitening alone & ZCA whitening cut read entropy from $1.26$ to $0.72$ nats but left presence
+recall at chance ($0.573$ mean). Sharpness is not addressing. & Negative result; motivated the gate \\
+Gap D, first slot audit & In the 21M checkpoint the read entropy was $3.03$--$3.16$ against $\ln24=3.178$,
+and zeroing the memory cost $+0.035$ nats: the memory was a slow average. & Defect reported; fixed by the gated read \\
+21M checkpoint & Predates the gated slot read. Its slot memory is the diffuse version, so the LM run
+does not demonstrate the fixed mechanism. & Stated explicitly \\
+Hardware & Weekly Kaggle GPU quota exhausted; mechanism and Gap~D runs re-executed on CPU with identical
+protocol. & Stated in \Cref{sec:experiments} \\
+MQAR keys & Early runs sampled keys with replacement, making queries ambiguous and capping accuracy near
+$0.6$. Keys are now unique per sequence. & Implementation invariant (I4) \\
+Decay bias init & A generic zero-bias initialiser reset every decay to $\alpha=0.5$ and bindings vanished
+in two steps. The spectrum initialiser now protects those parameters. & Implementation invariant (I2) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\paragraph{What is deliberately not in this report.}
+No result on 256K-token training, no matched transformer language-model baseline, no downstream
+benchmark scores, and no multi-GPU scaling measurement. These are not omissions by accident: the
+runs were not performed, and the corresponding rows of \Cref{tab:claims} say so. Where a number
+is a prototype artifact (the 21M held-out loss, the synthetic accuracies) the text says
+prototype; where a property is architectural (constant state, chunk invariance) the text says
+architectural. The distinction is the point of the report.

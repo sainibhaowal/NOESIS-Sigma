@@ -1,0 +1,65 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph{What the evidence supports.}
+Three claims survive the controls. First, the transition law is executable and its chunked
+implementation matches the sequential reference and the full forward to numerical precision,
+including at boundaries that cut through consolidation and summary blocks. Second, a
+multiscale decay initialisation is not cosmetic: with the bias frozen, a single rate loses
+long-range recall while the spectrum retains it. Third, a memory read needs an abstention path;
+a sharper softmax alone does not make a store content-addressed.
+
+\paragraph{Sharpness is not addressing.}
+The Gap D result is the clearest lesson of the study. ZCA whitening reduced read entropy from
+$1.26$ to $0.72$ nats and still left presence recall at chance. Entropy measures concentration,
+not correctness: whitening amplifies every deviation direction, including the context noise
+that should not be retrieved. The gated read adds two things that entropy does not capture: a
+write path that refuses redundancy, and a read path that can return \emph{nothing}. The
+confidence factor separates present ($0.56$) from absent ($0.03$) queries without direct
+supervision, and the ablation delta rises by an order of magnitude. A memory operator without a
+null hypothesis cannot express ``this is not in memory'', and no amount of temperature tuning
+supplies one.
+
+\paragraph{Negative results are part of the design.}
+State expansion was intended to add capacity; at 66 bindings it made accuracy worse. Chunk
+summaries were intended to add a global path; their measured benefit is within noise and an
+earlier run had the opposite sign. Reporting these results changes the architecture's story:
+the demonstrated recall mechanisms are the delta rule and the gated slot read, not the extra
+state matrices or the summary ring. The summary ring remains valuable as a design element---it
+is correct, chunk-invariant, and asymptotically cheaper than attention---but its quality
+benefit is an open question, not a result.
+
+\paragraph{Why there is no transformer language-model comparison.}
+The experiment ladder's transformer is a width-matched control for synthetic recall, not a
+language model. It was never trained on TinyStories. A matched LM comparison requires the same
+tokenizer, corpus, token budget, optimiser, evaluation split, and roughly matched parameters or
+FLOPs; that run has not been performed. Without it, statements such as ``SigmaStorm is better
+or worse than a transformer'' are unsupported. This is the single most important missing
+experiment, and it is cheap relative to the scale debate: a 21M transformer on 348M TinyStories
+tokens fits the same two-T4 budget.
+
+\paragraph{The long-context claim is architectural, not empirical.}
+The state contract is real: 200{,}704 bytes at $T=512$ and $T=4096$ for the tiny preset, and
+every operator is chunk-invariant. That is a prerequisite for streaming a 256K-token sequence
+in bounded memory, but it is not the same as training or evaluating at 256K. The 21M run used
+1{,}024-token windows with a differentiable horizon of $4\times256$ tokens in the reported
+configuration. Long-context ability---retrieval over tens of thousands of tokens, stability of
+the energy-controlled latent, and the interaction of the summary ring with the delta state---has
+not been measured. The design target is 256K; the evidence stops far short of it.
+
+\paragraph{Engineering cost.}
+At equal width SigmaStorm is slower than the transformer control on CPU and has more
+parameters. The operators are written in dense PyTorch; there are no fused kernels for the
+chunkwise delta solve, the slot consolidation, or the summary scan. The gap in
+\Cref{fig:cost} is therefore an implementation gap as much as an architectural one. A fair
+efficiency comparison would use fused kernels and measure tokens per second at matched
+parameter count and matched training budget. That work is not part of this report.
+
+\paragraph{What would change the conclusion.}
+Four experiments, in order of value: (i) a matched transformer LM baseline on the same corpus
+and budget; (ii) a gated-read 21M run to confirm that the synthetic gain survives language
+modeling; (iii) a capacity-stressed state-expansion run with enough steps for both variants to
+converge; (iv) a summary ablation with multiple seeds and a longer budget. If (i) shows a large
+deficit, the architecture needs a different argument than quality-per-token. If (ii) shows no
+change, the slot memory is not used by the language model even when it can abstain, which is
+itself an important negative result.

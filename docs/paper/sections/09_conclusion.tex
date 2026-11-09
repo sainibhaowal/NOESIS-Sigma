@@ -1,0 +1,39 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+SigmaStorm is an attempt to replace dense token-to-token attention with a bounded recurrent
+state whose transition law is explicit. The implementation is small, the evidence is small,
+and the report is written to make the boundary between the two visible.
+
+Three results are established at prototype scale. The chunkwise delta rule matches its
+sequential reference to $4.2\times10^{-7}$, and a chunked forward matches the full forward to
+$1.6\times10^{-6}$ with the split inside a slot-consolidation and a summary block. The state
+contract is real: $200{,}704$ bytes at $T=512$ and $T=4096$. A log-spaced decay spectrum
+prevents the long-range collapse of a single-rate model, $1.000$ vs.\ $0.297$ beyond 256 tokens
+under frozen rates. A gated slot read makes the memory content-addressed: presence recall rises
+from chance to $0.977/1.000/0.953$ over three seeds, the memory-ablation delta rises by an order
+of magnitude to $+2.26$ nats, and the mechanism does not regress MQAR, aggregate recall, or
+next-token loss.
+
+Two results are not established. Doubling the number of delta states reduced MQAR accuracy at
+66 bindings, and the summary ring's benefit is within noise and changed sign between runs. The
+architecture's demonstrated recall mechanisms are therefore narrower than the full block: the
+delta rule, the decay spectrum, and the gated slot read carry the evidence, while state
+expansion and chunk summaries remain implemented and correct but empirically unproven.
+
+The largest model, 21M parameters on 348M TinyStories tokens, reaches held-out loss $1.2523$
+and PPL $3.498$ and generates grammatical on-genre prose. It is a prototype, not a language
+model comparison. There is no matched transformer baseline, no 256K training, and no downstream
+evaluation. The architectural claim that motivates the design---constant memory per token---is
+a property of the state contract, not a measured long-context capability.
+
+What would change the conclusion is clear. A matched transformer LM baseline on the same
+corpus and budget would settle the quality question. A gated-read 21M run would show whether
+the synthetic gain survives language modeling. A capacity-stressed state-expansion run and a
+multi-seed summary ablation would resolve the two open mechanisms. These are cheap relative to
+the scale debate and should precede any larger training effort.
+
+The honest summary is this: the mechanisms are executable, the correctness gates hold, and one
+memory defect was found, diagnosed, and fixed with a controlled experiment. That is a
+foundation for further work, not a frontier result. The report is written so that a reader can
+check every number and see exactly where the evidence stops.

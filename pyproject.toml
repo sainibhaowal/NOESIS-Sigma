@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "noesis-sigma"
+version = "0.12.0"
+description = "Bounded-state sequence modeling without dense token-to-token attention"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "torch>=2.3",
+    "tokenizers>=0.15",
+]
+
+[tool.setuptools.packages.find]
+include = ["sigmastorm*", "training*"]
+
+[tool.black]
+line-length = 110
+target-version = ["py310", "py311", "py312", "py313"]
+extend-exclude = "(/\\.venv/|/build/|/dist/|/data/|/docs/paper/.*\\.py$)"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = [".venv", "data", "docs/paper"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+
+[tool.mypy]
+python_version = "3.12"
+# The model uses dynamic PyTorch module attributes that the upstream stubs cannot fully describe;
+# runtime behavior is covered by the complete pytest suite. Keep mypy focused on the typed config,
+# shard, and corpus entrypoints where static checking is reliable and actionable.
+files = ["sigmastorm/config.py", "training/data.py", "scripts/build_corpus.py"]
+follow_imports = "skip"
+ignore_missing_imports = true
+check_untyped_defs = true
+disallow_untyped_defs = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+exclude = "(^|/)(data|docs/paper|kaggle)/"
+
+[tool.bandit]
+exclude_dirs = [".venv", "data", "docs/paper"]
+# B101 is intentionally allowed in tests; the remaining suppressions are documented inline where
+# the project must load trusted local checkpoints or invoke the user-selected Kaggle CLI.
+skips = ["B101", "B105", "B106", "B108", "B404", "B603", "B607", "B614", "B615"]

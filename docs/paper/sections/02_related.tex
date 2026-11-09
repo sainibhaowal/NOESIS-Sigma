@@ -1,0 +1,55 @@
+\section{Related work}
+
+\paragraph{Efficient attention and long context.}
+Exact attention is quadratic in sequence length and its KV cache grows linearly with the
+prefix. Sparse and windowed attention reduce the interaction graph
+\citep{beltagy2020longformer,zaheer2020bigbird}; IO-aware kernels reduce the constant
+\citep{dao2022flashattention}. Frontier long-context systems now combine sparse attention with
+compressed caches, reporting hundreds of bytes per token \citep{deepseek2026,kimi2026}.
+SigmaStorm does not approximate dense attention: it removes the pairwise matrix and replaces
+it with a recurrent state plus a small number of bounded memory paths. Window attention, when
+enabled, is a sliding local operator with a ring-buffer state, not a global mask.
+
+\paragraph{Linear recurrences and delta rules.}
+Linear attention rewrites softmax attention as a running key--value summary
+\citep{katharopoulos2020transformers} and is equivalent to fast-weight programming
+\citep{schlag2021linear}. State-space models provide long-range convolution and selective
+recurrences \citep{gu2022s4,gu2024mamba}; RetNet and RWKV interleave decayed recurrence with
+token-wise gating \citep{sun2023retnet,peng2023rwkv}; gated linear attention adds
+hardware-efficient chunkwise training \citep{yang2024gla}. The delta rule used here belongs to
+the error-correcting family: the state is rewritten by the residual between an observed value
+and the value the state currently predicts, which is what makes a binding overwrite rather
+than blur \citep{yang2024gateddeltanet}. SigmaStorm contributes a multiscale initialisation of
+that rule and a chunkwise implementation with exact carry.
+
+\paragraph{Structured memory.}
+External-memory networks and differentiable stores introduced explicit read/write addressing
+\citep{graves2014neural}; modern Hopfield networks interpret attention-like reads as
+energy-minimising retrieval \citep{ramsauer2021hopfield}. SigmaStorm keeps several memory
+forms with different time scales---fast associative state, consolidated prototypes, pooled
+summaries---and exposes them through independent gates. The energy term in the transition is a
+\emph{contraction}, not a multi-basin attractor: strong convexity forbids many equilibria, and
+the memory operators, not the energy, hold information. This distinction is deliberate and is
+revisited in \Cref{sec:method-energy}.
+
+\paragraph{Recall benchmarks.}
+Multi-query associative recall (MQAR) isolates the ability to bind and retrieve key--value
+pairs and has become a standard diagnostic for efficient architectures
+\citep{arora2023zoology}. Mechanistic work on induction heads identifies the same
+copy-and-match primitive inside transformers \citep{olsson2022induction}. We use MQAR for
+associative recall, a delayed-recall task with distance buckets for the decay spectrum, an
+aggregate count task for the summary path, and a frozen-embedding presence task for the slot
+memory. Keeping the tasks separate matters: one operator can otherwise hide another's defect.
+
+\paragraph{Small language models.}
+TinyStories showed that models with a few million parameters can produce coherent English
+when the corpus is syntactically simple \citep{eldan2023tinystories}. It is the right scale
+for a prototype: a full training run fits on two 16\,GB T4 GPUs in two short sessions, and the
+generated text is easy to inspect. It is not evidence of general language ability, and
+perplexities are comparable only within the same tokenizer and split.
+
+\paragraph{Positioning.}
+SigmaStorm is not a transformer with layers removed, and it is not a single linear-attention
+approximation. Its claim is compositional: several operators with different inductive biases,
+mixed by independent gates on a bounded latent, with a strict state-size contract. The report
+tests the pieces separately and reports where the composition has not yet paid off.

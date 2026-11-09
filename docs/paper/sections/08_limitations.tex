@@ -1,0 +1,80 @@
+\section{Limitations}
+\label{sec:limitations}
+
+The results are deliberately narrow. This section lists what the study cannot support, so that
+the claims in \Cref{tab:claims} are not read more broadly than the evidence allows.
+
+\paragraph{Statistical power.}
+Most comparisons use two or three seeds, and we do not compute significance tests. The
+seed-to-seed spread on the aggregate task is larger than the effect being measured, which is
+why \Cref{sec:results-gap-bc} calls it inconclusive rather than positive. A single seed of the
+largest Gap~D arm would not have been convincing; the three-seed presence result is credible
+because every seed is far above chance and the arms are otherwise identical. The Gap~A result
+is a controlled ablation with frozen parameters, so seed noise is small, but it remains a
+single task.
+
+\paragraph{Construct validity of the synthetic tasks.}
+MQAR, delayed recall, aggregate count, and presence recall each isolate one operator. That is
+their purpose, but isolation is also their weakness: a mechanism that works on a synthetic
+binding task need not be the mechanism a language model uses. The presence task in particular
+uses frozen embeddings and untied heads to remove a shortcut; that control changes the
+optimisation problem relative to a normal language model, so the $0.977$ accuracy should be
+read as evidence about the read operator, not as a prediction of LM behaviour.
+
+\paragraph{No matched transformer language-model baseline.}
+This is the most important omission. The transformer in the experiment ladder is a width-matched
+control for synthetic recall and was never trained on TinyStories. It therefore cannot answer
+whether SigmaStorm is better or worse than a transformer at language modeling. Such a comparison
+requires the same tokenizer, corpus, token budget, optimiser, evaluation split, and roughly
+matched parameters or FLOPs. Until it exists, no capability comparison with transformers is
+supported, including comparisons implied by the architecture's motivation.
+
+\paragraph{Scale.}
+The largest model is 21M parameters, trained for roughly 348M tokens on TinyStories. There are
+no scaling curves, no runs at 100M or 1B parameters, and no data-mix study. TinyStories is a
+restricted corpus with simple syntax; success there says little about natural text. The
+tokenizer is an 8K byte-level BPE, so the reported perplexity is not comparable to perplexities
+computed with larger subword vocabularies.
+
+\paragraph{Long context.}
+Every operator is chunk-invariant and the state is constant in $T$, but the largest trained run
+used 1{,}024-token windows with a differentiable horizon of $4\times256$ tokens in the reported
+configuration. The 256K design target has not been trained or evaluated. Specifically unmeasured:
+retrieval over tens of thousands of tokens, stability of the energy-controlled latent over long
+streams, the interaction between the summary ring and the delta state at scale, and the quality
+of generation after chunked prefill. The chunk-invariance proof is a statement about
+implementation correctness, not about learned long-context ability.
+
+\paragraph{Efficiency measurements.}
+The cost table reports CPU forward times with two threads and batch size one. Those numbers
+measure dense PyTorch implementations without fused kernels for the chunkwise delta solve, the
+slot consolidation, or the summary scan. They are useful as a relative sanity check and as
+evidence that the operators are linear in $T$; they are not deployment throughput and they do
+not constitute a fair efficiency comparison against optimized attention kernels.
+
+\paragraph{Hardware and reruns.}
+The 21M language-model run used two 16\,GB T4 GPUs. The mechanism and Gap~D experiments were
+re-run on CPU after the weekly GPU quota was exhausted, with identical data, seeds, optimiser,
+and step counts. This is honest but not ideal: CPU and GPU floating-point behaviour differ, and
+the re-runs do not exercise the distributed training path. The absence of a multi-GPU scaling
+result is a gap in the engineering evidence, not just in the science.
+
+\paragraph{Evaluation breadth.}
+There are no downstream benchmarks, no zero-shot evaluations, no instruction tuning, and no
+human evaluation. The 21M model is a prototype that writes on-genre prose; it is not evaluated
+as an assistant. Claims about usefulness, safety, or alignment are outside the scope of this
+report and are not made.
+
+\paragraph{Known negative and unstable results.}
+State expansion reduced accuracy at 66 bindings, and the summary benefit changed sign between
+runs. Both are reported as results rather than suppressed. They limit the architectural story:
+the demonstrated recall mechanisms are the delta rule, the decay spectrum, and the gated slot
+read, not the additional state matrices or the summary ring. A reader should not infer that
+every component of the block contributes measured value.
+
+\paragraph{Reproducibility caveats.}
+All headline numbers are produced by scripts in the repository, and the raw artifacts are
+checked in. Reproducing them still requires the same package versions and, for the 21M run, the
+same two-GPU configuration. We report seeds and step counts, but we do not claim bitwise
+determinism across hardware. The paper's evidence policy is traceability to an artifact, not
+independent replication.

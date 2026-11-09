@@ -1,0 +1,413 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{Correctness gates}
+
+\Cref{tab:gates} lists the falsification gates. They are not capability results; they establish
+that the implementation matches its mathematical specification and that the state contract
+holds. The chunked-forward gate is the important one for long context: the split point is
+position 50, inside both a 64-token slot-consolidation block and a 32-token summary block, and
+the chunked hidden state still matches the full forward to $1.6\times10^{-6}$.
+
+\begin{table}[t]
+\centering
+\caption{Falsification gates (\texttt{scripts/gate.py}) and unit tests.}
+\label{tab:gates}
+\small
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}X r@{}}
+\toprule
+Gate & Measured \\
+\midrule
+Delta rule, chunkwise vs.\ sequential & $\max|\Delta o|=4.17\times10^{-7}$ \\
+ & $\max|\Delta S|=3.58\times10^{-7}$ \\
+Chunked vs.\ full forward (split at 50) & $\max|\Delta h|=1.55\times10^{-6}$ \\
+State bytes at $T=512$ and $T=4096$ & $200{,}704$ (constant) \\
+MQAR recall, 400 steps & $0.974$ vs.\ chance $0.062$ \\
+Unit tests (\texttt{pytest tests}) & 21 passed \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Decay spectrum (Gap A)}
+\label{sec:results-gap-a}
+
+\Cref{tab:gap-a} and \Cref{fig:gap-a} report delayed recall at four distance buckets. The
+comparison is deliberately isolated: the slot memory and summaries are disabled, and the decay
+bias is frozen so the comparison measures the initialised prior. When the bias is trainable, a
+single-rate model simply learns its own spectrum and the ablation shows nothing; that was the
+first, invalid version of this experiment (\Cref{app:ledger}).
+
+\begin{table}[t]
+\centering
+\caption{Delayed recall by distance (8 bindings, length 320, 300 steps). Frozen decay.}
+\label{tab:gap-a}
+\small
+\begin{tabular}{@{}l c c c c c@{}}
+\toprule
+Variant & Overall & $<32$ & $32$--$127$ & $128$--$255$ & $\geq256$ \\
+\midrule
+full & 0.984 & 0.984 & 0.984 & 1.000 & 0.969 \\
+spectrum & \textbf{1.000} & 1.000 & 1.000 & 1.000 & \textbf{1.000} \\
+single rate & 0.758 & 0.984 & 1.000 & 0.750 & 0.297 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=\columnwidth, height=5.1cm, ybar,
+  ymin=0, ymax=1.08, ylabel={Accuracy}, ylabel style={font=\small},
+  symbolic x coords={{$<32$},{$32$--$127$},{$128$--$255$},{$\geq256$}},
+  xtick=data, x tick label style={font=\scriptsize}, y tick label style={font=\scriptsize},
+  enlarge x limits=0.14,
+  legend style={font=\scriptsize, draw=none, at={(0.5,1.03)}, anchor=south, legend columns=3},
+  axis lines*=left
+]
+\addplot[fill=sigmaBlue!65, draw=sigmaBlue] coordinates
+  {({$<32$},0.984) ({$32$--$127$},0.984) ({$128$--$255$},1.000) ({$\geq256$},0.969)};
+\addplot[fill=sigmaTeal!65, draw=sigmaTeal] coordinates
+  {({$<32$},1.000) ({$32$--$127$},1.000) ({$128$--$255$},1.000) ({$\geq256$},1.000)};
+\addplot[fill=sigmaRed!55, draw=sigmaRed] coordinates
+  {({$<32$},0.984) ({$32$--$127$},1.000) ({$128$--$255$},0.750) ({$\geq256$},0.297)};
+\legend{full, spectrum, single rate}
+\end{axis}
+\end{tikzpicture}
+\caption{Recall collapses with distance when all heads share one frozen decay rate. The
+log-spaced spectrum holds every bucket; the full model is slightly below the delta-only
+spectrum at the longest bucket because the comparison mixes additional operators.}
+\label{fig:gap-a}
+\end{figure}
+
+The single rate is not broken at short distances: it reaches $0.984$ below 32 tokens and
+$1.000$ at $32$--$127$. The failure is specifically long-range, $0.297$ beyond 256 tokens,
+against $1.000$ for the spectrum. A single timescale cannot simultaneously forget local
+context and preserve a binding across hundreds of tokens; the spectrum can.
+
+\subsection{State expansion and chunk summaries (Gaps B and C)}
+\label{sec:results-gap-bc}
+
+\Cref{tab:gap-bc} reports the two comparisons whose benefit is \emph{not} established.
+
+\begin{table}[t]
+\centering
+\caption{Gap B (dense MQAR, 66 bindings) and Gap C (aggregate count). Both tasks are
+seed-noise-limited; see the text.}
+\label{tab:gap-bc}
+\small
+\begin{tabularx}{\columnwidth}{@{}l r r@{}}
+\toprule
+Variant & Accuracy & Params \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Capacity: MQAR, 66 bindings (chance $0.125$)}}\\
+\texttt{state\_expand}=1 & \textbf{0.754} & 1{,}694{,}911 \\
+\texttt{state\_expand}=2 & 0.555 & 2{,}027{,}231 \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Aggregate count (chance $0.111$)}}\\
+full (with summaries) & 0.703 & 2{,}080{,}744 \\
+no summaries & 0.672 & 1{,}817{,}556 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=2 by 1, horizontal sep=1.35cm},
+  width=0.49\columnwidth, height=4.6cm, ybar,
+  ymin=0, ymax=0.9,
+  tick label style={font=\scriptsize},
+  ylabel style={font=\small}, x tick label style={font=\scriptsize},
+  legend style={font=\scriptsize, draw=none},
+  axis lines*=left
+]
+\nextgroupplot[title={\scriptsize Gap B: 66-binding MQAR}, ylabel={Accuracy},
+  symbolic x coords={exp1,exp2}, xtick=data]
+\addplot[fill=sigmaTeal!65, draw=sigmaTeal] coordinates {(exp1,0.754) (exp2,0.555)};
+\draw[dashed, sigmaRed] (axis cs:exp1,0.125) -- (axis cs:exp2,0.125);
+\nextgroupplot[title={\scriptsize Gap C: aggregate count},
+  symbolic x coords={full,no-sum}, xtick=data]
+\addplot[fill=sigmaOrange!70, draw=sigmaOrange] coordinates {(full,0.703) (no-sum,0.672)};
+\draw[dashed, sigmaRed] (axis cs:full,0.111) -- (axis cs:no-sum,0.111);
+\end{groupplot}
+\end{tikzpicture}
+\caption{Neither extra state capacity nor the summary ring shows a reliable benefit at the
+tested budget. Dashed lines are chance. These are negative/inconclusive results, not hidden
+failures.}
+\label{fig:gap-bc}
+\end{figure}
+
+\textbf{State expansion.} Doubling the number of independent delta states did not improve
+dense MQAR; it reduced accuracy from $0.754$ to $0.555$. The task has 66 bindings, above the
+practical rank of one $32\times32$ state per head, so one might expect capacity to help. It
+did not at 300 steps. Possible explanations are optimisation (the larger model needs more
+steps) or interference between duplicated state matrices; the experiment does not distinguish
+them. We therefore do not claim a capacity benefit.
+
+\textbf{Chunk summaries.} The aggregate count task improves by $0.031$ with summaries,
+$0.703$ vs.\ $0.672$. An earlier run measured $0.797$ with summaries and $0.891$ without,
+\ie the opposite sign. The metric is noise-limited at this budget, and the summary change was
+not adopted on the strength of either run. The operator is correct and chunk-invariant; its
+quality benefit remains unproven.
+
+\subsection{The gated slot read (Gap D)}
+\label{sec:results-gap-d}
+
+\Cref{tab:presence} reports the three-arm presence experiment: the previous cosine read, the
+ZCA-whitened read on its own, and the shipped gated mechanism (novelty dead-zone, read
+temperature, abstention). All arms use identical data, seeds, optimiser, and 800 steps.
+
+\begin{table}[t]
+\centering
+\caption{Presence recall with frozen embeddings (16 symbols, 8 present, chance $0.50$).
+Means over seeds are shown for readability; individual seeds are the evidence.}
+\label{tab:presence}
+\small
+\begin{tabularx}{\columnwidth}{@{}l c c c c@{}}
+\toprule
+Arm & Seed 0 & Seed 1 & Seed 2 & Mean \\
+\midrule
+cosine (previous) & 0.562 & 0.539 & 0.555 & 0.552 \\
+ZCA-whitened & 0.648 & 0.531 & 0.539 & 0.573 \\
+\textbf{gated} & \textbf{0.977} & \textbf{1.000} & \textbf{0.953} & \textbf{0.977} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=3 by 1, horizontal sep=1.25cm},
+  width=0.31\textwidth, height=5.0cm, ybar,
+  tick label style={font=\scriptsize}, ylabel style={font=\small},
+  axis lines*=left, ymin=0
+]
+\nextgroupplot[title={\scriptsize presence accuracy}, ylabel={Accuracy}, ymax=1.08,
+  symbolic x coords={cos,whiten,gated}, xtick=data,
+  xticklabels={cosine,whitened,gated}]
+\addplot[fill=sigmaBlue!60, draw=sigmaBlue] coordinates {(cos,0.552) (whiten,0.573) (gated,0.977)};
+\draw[dashed, sigmaRed] (axis cs:cos,0.50) -- (axis cs:gated,0.50);
+\nextgroupplot[title={\scriptsize read entropy (nats)}, ylabel={Entropy}, ymax=3.0,
+  symbolic x coords={cos,whiten,gated}, xtick=data,
+  xticklabels={cosine,whitened,gated}]
+\addplot[fill=sigmaTeal!60, draw=sigmaTeal] coordinates {(cos,1.2595) (whiten,0.7246) (gated,0.4132)};
+\draw[dashed, sigmaRed] (axis cs:cos,2.7726) -- (axis cs:gated,2.7726);
+\nextgroupplot[title={\scriptsize memory ablation $\Delta$ (nats)}, ylabel={$\Delta$ CE}, ymax=2.6,
+  symbolic x coords={cos,whiten,gated}, xtick=data,
+  xticklabels={cosine,whitened,gated}]
+\addplot[fill=sigmaOrange!65, draw=sigmaOrange] coordinates {(cos,0.1467) (whiten,0.2173) (gated,2.2551)};
+\end{groupplot}
+\end{tikzpicture}
+\caption{Gap D in one view. Whitening sharpens the read (entropy falls) but does not make it
+useful; the gated read both sharpens it and makes it load-bearing, as shown by the ablation
+delta. Dashed lines: chance accuracy, uniform entropy $\ln16=2.773$ nats.}
+\label{fig:gap-d}
+\end{figure*}
+
+\begin{table}[t]
+\centering
+\caption{Gap D diagnostics, seed 0, 16 slots. Uniform read entropy is $\ln16=2.773$ nats.}
+\label{tab:gap-d-diag}
+\small
+\begin{tabularx}{\columnwidth}{@{}l c c c c c@{}}
+\toprule
+Arm & Entropy & Top $w$ & Key cos & CE & $\Delta_{\mathrm{abl}}$ \\
+\midrule
+cosine & 1.260 & 0.608 & 0.023 & 0.663 & $+0.147$ \\
+whitened & 0.725 & 0.788 & $-0.044$ & 0.517 & $+0.217$ \\
+gated & \textbf{0.413} & \textbf{0.820} & 0.004 & \textbf{0.019} & $\mathbf{+2.255}$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The gated read is not merely sharper; it is discriminating. Match confidence averages
+$0.562$ on present queries and $0.026$ on absent ones, \ie the abstention path separates the
+two populations without supervision on the gate. The ablation delta shows the same from the
+other side: zeroing the memory now costs $2.26$ nats, against $0.15$ before, so the residual
+stream alone can no longer answer the task. ZCA whitening sharpens entropy from $1.26$ to
+$0.72$ nats but leaves accuracy at chance, because it amplifies every deviation direction,
+including context noise.
+
+\paragraph{No-regression controls.}
+The gated mechanism must not break the paths it does not target. \Cref{tab:regression} shows
+MQAR (delta-rule path), aggregate recall (summary path), and a 600-step real-data next-token
+comparison on the tiny preset. MQAR is unchanged to within seed noise, and is slightly higher
+for the gated arm ($+0.002$ and $+0.008$). The aggregate task is seed-noisy but the gated arm
+is above the previous behaviour on both seeds. Real-data language modeling moves val CE from
+$3.0760$ to $3.0826$ nats, a $0.2\%$ difference inside the run-to-run spread; the training
+curves overlap throughout (\Cref{fig:lm-check}).
+
+\begin{table}[t]
+\centering
+\caption{No-regression controls for the gated read. MQAR: 400 steps, 2 seeds. Aggregate:
+600 steps, 2 seeds. LM: tiny preset, 3.06M params, 600 steps, identical stream.}
+\label{tab:regression}
+\small
+\begin{tabularx}{\columnwidth}{@{}l c c@{}}
+\toprule
+Measure & previous & gated \\
+\midrule
+MQAR seed 0 & 0.988 & \textbf{0.990} \\
+MQAR seed 1 & 0.979 & \textbf{0.987} \\
+Aggregate seed 0 & 0.680 & \textbf{0.836} \\
+Aggregate seed 1 & 1.000 & 0.859 \\
+LM val CE (nats) & \textbf{3.0760} & 3.0826 \\
+LM PPL & 21.67 & 21.82 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=\columnwidth, height=4.4cm,
+  xlabel={optimizer step}, ylabel={training CE (nats)},
+  xmin=150, xmax=650, ymin=2.9, ymax=4.45,
+  tick label style={font=\scriptsize}, label style={font=\small},
+  legend style={font=\scriptsize, draw=none, at={(0.03,0.97)}, anchor=north west},
+  axis lines*=left, grid=major, grid style={black!10}
+]
+\addplot[thick, sigmaBlue, mark=*] coordinates {(200,4.2786) (400,3.4066) (600,3.0300)};
+\addplot[thick, sigmaOrange, mark=square*, dashed] coordinates {(200,4.2745) (400,3.4105) (600,3.0431)};
+\legend{baseline, gated}
+\end{axis}
+\end{tikzpicture}
+\caption{Real TinyStories next-token training, identical stream. The gated slot read does not
+change the loss trajectory. Held-out CE is $3.0760$ (baseline) vs.\ $3.0826$ (gated).}
+\label{fig:lm-check}
+\end{figure}
+
+\subsection{Language modeling at 21M parameters}
+\label{sec:results-lm}
+
+The largest model in this report has 20{,}996{,}090 parameters (6 blocks, width 320, 8 heads,
+\texttt{state\_expand}=2, 24 slots, 32 summary slots, no MoE). It was trained on TinyStories
+(8K byte-level BPE, 300M-token training split) for 10{,}604 steps in two resumed sessions on
+two T4 GPUs, a total of roughly 348M tokens. \Cref{tab:20m} reports the two held-out
+evaluations.
+
+\begin{table}[t]
+\centering
+\caption{21M TinyStories run, 2\,$\times$\,T4, fp16 DDP. Held-out evaluation is 20 batches of
+4\,$\,$ $\times$\,1024 tokens (81{,}840 supervised tokens). MQAR is far out of distribution
+and is reported for completeness only.}
+\label{tab:20m}
+\small
+\begin{tabular}{@{}l c c c@{}}
+\toprule
+Session & Steps & Held-out loss & PPL \\
+\midrule
+1 & 5{,}442 & 1.3225 & 3.753 \\
+2 & 10{,}604 & \textbf{1.2523} & \textbf{3.498} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The model writes grammatical, on-genre TinyStories prose from a prompt. The checkpoint
+predates the gated slot read; its slot memory is the diffuse version audited in
+\Cref{tab:slotaudit}, which is exactly the defect Gap D removes. The language model is useful
+as a prototype, not as evidence of general language ability: TinyStories is a restricted
+synthetic corpus, the tokenizer is 8K byte-level BPE, and no transformer was trained on the
+same data for comparison.
+
+\begin{table}[t]
+\centering
+\caption{Slot-memory audit of the 21M checkpoint (pre-fix). Uniform read entropy is
+$\ln24=3.178$ nats. Zeroing the read costs only $+0.035$ nats: the memory acts as a slow
+average. This table motivates the gated read.}
+\label{tab:slotaudit}
+\small
+\begin{tabular}{@{}c c c c@{}}
+\toprule
+Block & Read entropy & Top weight & Cross-slot cos \\
+\midrule
+0 & 3.133 & 0.065 & 0.465 \\
+1 & 3.109 & 0.073 & 0.525 \\
+2 & 3.160 & 0.070 & 0.810 \\
+3 & 3.159 & 0.055 & 0.715 \\
+4 & 3.048 & 0.131 & 0.716 \\
+5 & 3.095 & 0.078 & 0.483 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table*}[t]
+\centering
+\caption{Representative samples from the step-10{,}604 checkpoint (temperature 0.7, top-$k$ 40),
+truncated. These show local coherence, not long-horizon recall.}
+\label{tab:samples}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}X@{}}
+\toprule
+``Once upon a time, there was a little girl named Lily. She loved to play with her toys and
+make them into different things. One day, she found a toy that was different from the others.
+It was a big, shiny rock that had a pointy edge\ldots'' \\
+``The little dog ran into the garden and saw the flowers. He was so happy and he couldn't wait
+to show all his friends. But then, something bad happened. A big dog came running and scared
+the little dog away\ldots'' \\
+``Tom was very sad because he lost his toy. He looked everywhere for it, but it was nowhere to
+be found. He started to cry because he missed his toy so much. His mother was worried and
+asked him what was wrong\ldots'' \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+\subsection{Cost and state}
+\label{sec:results-cost}
+
+\Cref{tab:cost} compares SigmaStorm with the size-matched-in-width transformer control from
+the experiment ladder. The control matches width, depth, heads, and FFN multiplier, not total
+parameter count: SigmaStorm's operators add parameters, so at the same width it has about
+$2.3$--$3.0\times$ more parameters and, on CPU, is roughly $2$--$9\times$ slower per forward
+pass. There is no compute-efficiency claim here. The architectural advantage that motivates the
+design is memory: state is constant in context (\Cref{tab:gates}), while a transformer KV cache
+grows linearly. That advantage only matters if long-context training works at scale, which is
+not demonstrated in this report.
+
+\begin{table}[t]
+\centering
+\caption{Forward cost at equal width (CPU, two threads, batch 1). The transformer control
+matches width/depth, not parameter count.}
+\label{tab:cost}
+\small
+\begin{tabular}{@{}l r r r r@{}}
+\toprule
+Config & $\Sigma$ params & $\Sigma$ s & T params & T s \\
+\midrule
+tiny $T{=}128$ & 2.08M & 0.031 & 0.68M & 0.0036 \\
+tiny $T{=}512$ & 2.08M & 0.102 & 0.68M & 0.0147 \\
+tiny $T{=}2048$ & 2.08M & 0.411 & 0.68M & 0.1404 \\
+20M $T{=}128$ & 20.97M & 0.094 & 8.37M & 0.0180 \\
+20M $T{=}512$ & 20.97M & 0.321 & 8.37M & 0.0761 \\
+20M $T{=}2048$ & 20.97M & 1.339 & 8.37M & 0.5872 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=\columnwidth, height=4.4cm,
+  xlabel={sequence length $T$}, ylabel={forward time (s)},
+  xmode=log, ymode=log, log basis x=2,
+  xtick={128,512,2048}, xticklabels={128,512,2048},
+  tick label style={font=\scriptsize}, label style={font=\small},
+  legend style={font=\scriptsize, draw=none, at={(0.03,0.97)}, anchor=north west},
+  axis lines*=left, grid=major, grid style={black!10}
+]
+\addplot[thick, sigmaBlue, mark=*] coordinates {(128,0.0938) (512,0.3214) (2048,1.3388)};
+\addplot[thick, sigmaOrange, mark=square*, dashed] coordinates {(128,0.0180) (512,0.0761) (2048,0.5872)};
+\legend{SigmaStorm 21M, transformer control 8.4M}
+\end{axis}
+\end{tikzpicture}
+\caption{Forward cost of the 21M configuration and the width-matched transformer control on
+CPU. Both are linear in $T$, but SigmaStorm's operators cost more per token at this
+implementation. The relative gap is an engineering problem, not a property of the
+architecture.}
+\label{fig:cost}
+\end{figure}

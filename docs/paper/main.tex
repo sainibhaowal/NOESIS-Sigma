@@ -1,0 +1,115 @@
+\documentclass[10pt,twocolumn]{article}
+
+% SigmaStorm technical report.  Evidence policy: every number in this document is
+% traced to a script or artifact in the repository; unmeasured claims are marked
+% as such and collected in the honesty ledger (Appendix C).
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper,top=1.7cm,bottom=1.8cm,left=1.55cm,right=1.55cm,columnsep=0.65cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{booktabs,multirow,array,tabularx,threeparttable}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,fit,positioning,shapes.geometric,shapes.misc,matrix,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{groupplots}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{natbib}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+\usepackage{balance}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{placeins}
+
+\definecolor{sigmaBlue}{HTML}{1B4F72}
+\definecolor{sigmaTeal}{HTML}{117A65}
+\definecolor{sigmaOrange}{HTML}{B9770E}
+\definecolor{sigmaRed}{HTML}{922B21}
+\definecolor{lightBlue}{HTML}{EAF2F8}
+\definecolor{lightTeal}{HTML}{E8F8F5}
+\definecolor{lightOrange}{HTML}{FEF5E7}
+\hypersetup{colorlinks=true,linkcolor=sigmaBlue,citecolor=sigmaBlue,urlcolor=sigmaBlue}
+\titleformat{\section}{\large\bfseries\color{sigmaBlue}}{\thesection}{0.55em}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{sigmaTeal}}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.5em}{}
+\setlist{nosep,leftmargin=*}
+\setlist[itemize]{label=\textbullet}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize SigmaStorm: technical report}
+\fancyhead[R]{\footnotesize \thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+\newcommand{\rms}{\mathrm{RMSNorm}}
+\newcommand{\softmax}{\operatorname{softmax}}
+\newcommand{\Proj}{\Pi_{R}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\T}{^{\top}}
+\newcommand{\eg}{e.g.}
+\newcommand{\ie}{i.e.}
+\newcommand{\etal}{et al.}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{observation}{Observation}
+
+\title{\vspace{-1.1em}\textbf{SigmaStorm: Bounded-State Sequence Modeling without Dense Token-to-Token Attention}\\[0.4em]
+\large A technical report on mechanisms, falsification gates, and prototype-scale evidence}
+\author{NOESIS-$\Sigma$ Research\\[-0.1em]
+\small \texttt{github.com/sainibhaowal/NOESIS-SIGMA}}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe \textbf{SigmaStorm}, a sequence model that replaces dense token-to-token
+attention with a fixed-size recurrent state advanced by a bounded transition law. Each
+token is processed by heterogeneous operators---a short convolution, a gated delta-rule
+associative memory with a multiscale decay spectrum, per-token-gated slot memory, a ring
+of chunk summaries, and optional window attention---whose proposals are mixed by
+independent sigmoid gates, contracted by an energy gradient, and projected onto a norm
+ball. Every piece of state is fixed-size, so memory does not grow with context, and every
+operator is exactly chunk-invariant. Equivalence gates measure the delta rule against its
+sequential reference to $4.2\times10^{-7}$ and a chunked forward against the full forward
+to $1.6\times10^{-6}$, with the split placed inside a slot-consolidation and a summary
+block. On synthetic recall the model reaches $0.974$ on multi-query associative recall
+against $0.062$ chance; the decay spectrum removes the long-range collapse of a single-rate
+model ($1.000$ vs.\ $0.297$ at distances $\geq256$ tokens). We report a gated slot read
+that makes the slot memory content-addressed: presence recall rises from near chance
+($0.56/0.54/0.56$) to $\mathbf{0.977/1.000/0.953}$ across three seeds, with a $+2.26$-nat
+memory-ablation delta, without regressing recall or next-token loss. A 21M-parameter
+TinyStories model trained on 348M tokens reaches held-out loss $1.2523$ (PPL $3.498$).
+We also report what is \emph{not} established: a capacity benefit from state expansion, a
+reliable benefit from chunk summaries, long-context training at 256K tokens, and any
+head-to-head language-modeling comparison with a transformer. This is a prototype evidence
+record, not a frontier claim.
+\end{abstract}
+
+\input{sections/01_intro}
+\input{sections/02_related}
+\input{sections/03_method}
+\input{sections/04_memory}
+\input{sections/05_experiments}
+\input{sections/06_results}
+\input{sections/07_discussion}
+\input{sections/08_limitations}
+\input{sections/09_conclusion}
+
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\clearpage
+\onecolumn
+\input{sections/appendix}
+
+\end{document}

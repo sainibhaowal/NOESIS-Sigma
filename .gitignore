@@ -1,0 +1,67 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Virtual environments and local package metadata
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+build/
+dist/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local.json
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Training data, checkpoints, and generated run output
+data/*
+runs/
+checkpoints/
+*.bin
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.npz
+*.npy
+
+# Logs and generated reports
+*.log
+*.out
+*.tmp
+*.bak
+
+# Generated LaTeX/PDF artifacts; keep the .tex and .bib sources
+docs/paper/*.aux
+docs/paper/*.bbl
+docs/paper/*.blg
+docs/paper/*.fdb_latexmk
+docs/paper/*.fls
+docs/paper/*.pdf
+docs/paper/*.synctex.gz
+docs/paper/*.toc
+
+# Kaggle outputs are generated; kernel sources and metadata remain tracked
+kaggle/**/output/
+kaggle/**/runs/

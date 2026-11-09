@@ -1,0 +1,179 @@
+{
+  "aggregate": {
+    "task": "count symbols seen ~150 tokens back",
+    "variants": {
+      "full": {
+        "params": 2080744,
+        "seconds": 143.5,
+        "accuracy": 0.703125,
+        "state_bytes_per_sample": 184960
+      },
+      "no_summary": {
+        "params": 1817556,
+        "seconds": 124.1,
+        "accuracy": 0.671875,
+        "state_bytes_per_sample": 150912
+      }
+    }
+  },
+  "distance": {
+    "task": "delayed recall, 8 bindings, length 320",
+    "variants": {
+      "full": {
+        "params": 2084840,
+        "seconds": 239.7,
+        "accuracy": 0.984375,
+        "by_distance": {
+          "<32": 0.984375,
+          "32-127": 0.984375,
+          "128-255": 1.0,
+          ">=256": 0.96875
+        },
+        "state_bytes_per_sample": 217984
+      },
+      "delta_spectrum": {
+        "params": 1513132,
+        "seconds": 141.9,
+        "accuracy": 1.0,
+        "by_distance": {
+          "<32": 1.0,
+          "32-127": 1.0,
+          "128-255": 1.0,
+          ">=256": 1.0
+        },
+        "state_bytes_per_sample": 68608
+      },
+      "delta_single_rate": {
+        "params": 1513132,
+        "seconds": 142.8,
+        "accuracy": 0.7578125,
+        "by_distance": {
+          "<32": 0.984375,
+          "32-127": 1.0,
+          "128-255": 0.75,
+          ">=256": 0.296875
+        },
+        "state_bytes_per_sample": 68608
+      }
+    }
+  },
+  "capacity": {
+    "task": "dense MQAR, 66 bindings, 4 queries",
+    "variants": {
+      "expand_1": {
+        "params": 1694911,
+        "seconds": 161.8,
+        "accuracy": 0.75390625,
+        "state_bytes_per_sample": 167936
+      },
+      "expand_2": {
+        "params": 2027231,
+        "seconds": 197.0,
+        "accuracy": 0.5546875,
+        "state_bytes_per_sample": 200704
+      }
+    }
+  },
+  "slots": {
+    "task": "presence recall, length 192, conv + slots only",
+    "variants": {
+      "slot_block_64": {
+        "params": 1155984,
+        "seconds": 70.2,
+        "accuracy": 0.4375,
+        "state_bytes_per_sample": 85376
+      },
+      "slot_block_4096": {
+        "params": 1155984,
+        "seconds": 69.0,
+        "accuracy": 0.453125,
+        "state_bytes_per_sample": 85376
+      }
+    }
+  },
+  "baseline": {
+    "task": "MQAR 26 bindings / 16 values / 4 queries",
+    "sigma": {
+      "params": 2019039,
+      "seconds": 137.1,
+      "accuracy": 0.9765625,
+      "state_bytes_per_sample": 200704
+    },
+    "transformer": {
+      "params": 622548,
+      "seconds": 25.2,
+      "accuracy": 0.09635416666666667
+    },
+    "chance": 0.0625
+  },
+  "cost": {
+    "variants": {
+      "tiny_T128": {
+        "sigma": {
+          "params": 2076383,
+          "forward_s": 0.031,
+          "state_bytes": 200704
+        },
+        "transformer": {
+          "params": 679892,
+          "forward_s": 0.0036
+        }
+      },
+      "tiny_T512": {
+        "sigma": {
+          "params": 2076383,
+          "forward_s": 0.1021,
+          "state_bytes": 200704
+        },
+        "transformer": {
+          "params": 679892,
+          "forward_s": 0.0147
+        }
+      },
+      "tiny_T2048": {
+        "sigma": {
+          "params": 2076383,
+          "forward_s": 0.4111,
+          "state_bytes": 200704
+        },
+        "transformer": {
+          "params": 679892,
+          "forward_s": 0.1404
+        }
+      },
+      "20m_T128": {
+        "sigma": {
+          "params": 20965370,
+          "forward_s": 0.0938,
+          "state_bytes": 1069408
+        },
+        "transformer": {
+          "params": 8369604,
+          "forward_s": 0.018
+        }
+      },
+      "20m_T512": {
+        "sigma": {
+          "params": 20965370,
+          "forward_s": 0.3214,
+          "state_bytes": 1069408
+        },
+        "transformer": {
+          "params": 8369604,
+          "forward_s": 0.0761
+        }
+      },
+      "20m_T2048": {
+        "sigma": {
+          "params": 20965370,
+          "forward_s": 1.3388,
+          "state_bytes": 1069408
+        },
+        "transformer": {
+          "params": 8369604,
+          "forward_s": 0.5872
+        }
+      }
+    }
+  }
+}

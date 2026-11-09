@@ -1,0 +1,87 @@
+\section{Introduction}
+
+Transformers owe much of their success to exact token-to-token attention, and much of their
+cost to it as well: the attention matrix and the key--value cache grow linearly in sequence
+length, so long-context inference pays memory proportional to the number of tokens already
+seen \citep{vaswani2017attention,dao2022flashattention}. Recent frontier systems attack this
+cost with compressed or sparse attention and with aggressive KV-cache compression
+\citep{kimi2026,deepseek2026}. A complementary question is architectural: can a model replace
+the pairwise interaction matrix with a \emph{fixed-size} recurrent state that nevertheless
+supports several distinct kinds of memory?
+
+SigmaStorm is a concrete answer in code and measurement. One block advances a token-local
+latent once:
+\begin{equation}
+  \label{eq:block}
+  \begin{aligned}
+    u &= \rms(x),\\
+    d_i &= \mathrm{op}_i(u) \quad \text{for each enabled } i,\\
+    m &= \frac{\sum_i \alpha_i(u)\,d_i}{\sum_i \alpha_i(u)},\\
+    \alpha_i(u) &= \sigma(w_i^\top u),\\
+    v &= \Proj\!\Big(u + \Delta t(u)\,\big[m - \nabla E(u) + u\big]\Big),\\
+    x' &= x + W_o v .
+  \end{aligned}
+\end{equation}
+The gates $\alpha_i$ are independent sigmoids rather than a softmax; each operator output is
+individually RMS-normalised before gating; the mixture is normalised by its gate sum so that
+opening more gates does not amplify the proposal; and the projection enforces a hard norm
+bound. Depth plays the role of transition time, while recurrent state---not the token prefix---carries
+information across positions.
+
+The operators are chosen to cover different failure modes of sequence modeling:
+a short convolution for local order, a gated delta rule for key$\to$value associations, a
+slot memory for long-horizon prototypes, a ring of pooled chunk summaries for a global path
+that neither decays exponentially nor costs $T^2$, optional window attention for precise
+local copying, and an energy term that stabilises the latent trajectory. \Cref{tab:operators}
+lists their cost and state. Every state tensor has a shape independent of $T$.
+
+\paragraph{Scope and evidence policy.}
+This report is deliberately a prototype record. It separates three things that are often
+conflated in architecture papers: (i) mechanisms that are \emph{implemented}, (ii) properties
+that are \emph{measured} by a falsification gate, and (iii) capabilities that are
+\emph{demonstrated} by a controlled experiment. Appendix~\ref{app:ledger} records earlier
+claims that failed to reproduce. The central negative results are reported with the same
+prominence as the positive ones.
+
+\subsection{Contributions}
+
+\begin{enumerate}[leftmargin=1.2em]
+\item \textbf{An executable transition law with a hard state contract.}
+      \Cref{sec:method} gives the operator mixture, energy contraction, bounded projection,
+      and the exact chunk-carrying rules. The same code runs a 2M-parameter mechanism model
+      and a 21M-parameter language model.
+\item \textbf{Exact chunk invariance for every operator.}
+      The delta rule, slot memory (including its write accumulator), and summary ring
+      (including its partial-chunk accumulator) are carried in the state. A gate splits a
+      sequence at position 50---inside a 64-token slot block and a 32-token summary block---and
+      matches the full forward to $1.6\times10^{-6}$ (\Cref{tab:gates}).
+\item \textbf{A multiscale decay spectrum.}
+      Each delta-rule head starts at its own log-spaced rate. With the spectrum frozen, recall
+      at distances $\geq256$ is $1.000$, versus $0.297$ for a single frozen rate
+      (\Cref{sec:results-gap-a}).
+\item \textbf{A gated, content-addressed slot read.}
+      A novelty dead-zone on writes, a separate read temperature, and a learned
+      match-confidence gate turn a diffuse softmax average into an address. Presence recall
+      moves from chance to $0.977/1.000/0.953$ over three seeds, and zeroing the memory now
+      costs $+2.26$ nats instead of $+0.15$ (\Cref{sec:results-gap-d}).
+\item \textbf{No-regression controls.}
+      The gated read leaves MQAR ($0.990/0.987$ vs.\ $0.988/0.979$), aggregate recall, and a
+      real-data next-token loss ($3.0826$ vs.\ $3.0760$ nats) within seed noise.
+\item \textbf{An honest capability map.}
+      A 21M model writes coherent TinyStories prose (held-out PPL $3.498$), while state
+      expansion, chunk-summary benefit, and 256K-context training remain unproven at this
+      scale (\Cref{tab:claims}).
+\end{enumerate}
+
+\subsection{Claims and non-claims}
+
+\textbf{We claim}: the mechanisms above are correct under their equivalence tests; the decay
+spectrum and the gated slot read have controlled evidence on synthetic recall; a small
+language model trains and generates; state size is independent of context.
+
+\textbf{We do not claim}: that SigmaStorm matches or beats transformers at language modeling,
+that 256K-token context has been trained or evaluated, that state expansion increases
+capacity, that chunk summaries reliably improve quality, or that any result here extrapolates
+to frontier scale. The largest model in this report is 21M parameters, trained on 348M tokens
+of a synthetic children's corpus; the timing measurements are single-machine CPU forward
+passes, not production throughput.
