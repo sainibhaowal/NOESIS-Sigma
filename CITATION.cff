@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use NOESIS-Σ, please cite this repository and its technical report."
+title: "NOESIS-Σ: Bounded-State Sequence Modeling without Dense Token-to-Token Attention"
+type: software
+version: "0.12.0"
+license: Apache-2.0
+repository-code: "https://github.com/sainibhaowal/NOESIS-Sigma"
+keywords:
+  - recurrent sequence modeling
+  - bounded-state modeling
+  - linear-time memory
+  - delta rule
+  - long-context research
+authors:
+  - name: "sainibhaowal"

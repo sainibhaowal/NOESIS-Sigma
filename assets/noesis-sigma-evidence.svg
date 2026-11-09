@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720" role="img" aria-labelledby="title desc">
+  <title id="title">NOESIS-Σ recorded mechanism evidence</title>
+  <desc id="desc">A chart showing MQAR accuracy versus chance, constant state bytes at two context lengths, and recorded equivalence and test results. It also labels 256K context and frontier parity as unmeasured.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1020"/>
+      <stop offset="0.56" stop-color="#111a33"/>
+      <stop offset="1" stop-color="#21183d"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#65f6ff"/>
+      <stop offset="1" stop-color="#6d9cff"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9b7cff"/>
+      <stop offset="1" stop-color="#ef78d5"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="10" y="10" width="1380" height="700" rx="34" fill="url(#bg)" stroke="#5befff" stroke-opacity="0.78" stroke-width="2"/>
+  <rect x="26" y="26" width="1348" height="668" rx="24" fill="none" stroke="#a77bff" stroke-opacity="0.25"/>
+
+  <text x="52" y="70" fill="#6cf5ff" font-family="Inter,Segoe UI,sans-serif" font-size="15" font-weight="700" letter-spacing="4">NOESIS-Σ · RECORDED MECHANISM EVIDENCE</text>
+  <text x="52" y="108" fill="#f4f7ff" font-family="Inter,Segoe UI,sans-serif" font-size="28" font-weight="700">What the current repository actually establishes</text>
+  <text x="52" y="136" fill="#aab8d5" font-family="Inter,Segoe UI,sans-serif" font-size="16">Short-run gates validate implementation behavior; they do not substitute for long-context or frontier-scale evaluation.</text>
+
+  <g font-family="Inter,Segoe UI,sans-serif">
+    <rect x="52" y="174" width="406" height="406" rx="24" fill="#0e172c" stroke="#65f6ff" stroke-opacity="0.48"/>
+    <text x="78" y="214" fill="#d7e5ff" font-size="16" font-weight="700" letter-spacing="1.5">MQAR ASSOCIATIVE RECALL</text>
+    <text x="78" y="240" fill="#8fa3c8" font-size="13">400 optimization steps · chance = 0.062</text>
+    <text x="78" y="285" fill="#9fb1d2" font-size="12">0.0</text>
+    <text x="420" y="285" fill="#9fb1d2" font-size="12" text-anchor="end">1.0</text>
+    <line x1="78" y1="294" x2="420" y2="294" stroke="#354463"/>
+    <rect x="78" y="318" width="333" height="38" rx="10" fill="url(#cyan)" filter="url(#glow)"/>
+    <text x="420" y="343" fill="#f4f7ff" font-size="15" font-weight="700" text-anchor="end">0.974</text>
+    <text x="78" y="380" fill="#6cf5ff" font-size="13" font-weight="700">GATE RECALL</text>
+    <rect x="78" y="400" width="21" height="38" rx="10" fill="#4d5277"/>
+    <text x="420" y="425" fill="#c8c8df" font-size="15" font-weight="700" text-anchor="end">0.062</text>
+    <text x="78" y="462" fill="#aeb9d3" font-size="13">The gate measures learnability on a synthetic</text>
+    <text x="78" y="483" fill="#aeb9d3" font-size="13">associative task, not language-model quality.</text>
+    <line x1="78" y1="520" x2="420" y2="520" stroke="#273552"/>
+    <text x="78" y="548" fill="#ef9be0" font-size="13" font-weight="700">READ AS</text>
+    <text x="142" y="548" fill="#c8b8d8" font-size="13">mechanism gate · not benchmark parity</text>
+
+    <rect x="486" y="174" width="406" height="406" rx="24" fill="#0e172c" stroke="#b78cff" stroke-opacity="0.5"/>
+    <text x="512" y="214" fill="#d7e5ff" font-size="16" font-weight="700" letter-spacing="1.5">STATE CAPACITY</text>
+    <text x="512" y="240" fill="#8fa3c8" font-size="13">Tiny preset · one sample · fixed state shape</text>
+    <text x="512" y="285" fill="#9fb1d2" font-size="12">0 bytes</text>
+    <text x="866" y="285" fill="#9fb1d2" font-size="12" text-anchor="end">200,704</text>
+    <line x1="512" y1="294" x2="866" y2="294" stroke="#354463"/>
+    <rect x="512" y="318" width="354" height="38" rx="10" fill="url(#violet)" filter="url(#glow)"/>
+    <text x="866" y="343" fill="#f4f7ff" font-size="15" font-weight="700" text-anchor="end">T = 512</text>
+    <rect x="512" y="400" width="354" height="38" rx="10" fill="url(#violet)"/>
+    <text x="866" y="425" fill="#f4f7ff" font-size="15" font-weight="700" text-anchor="end">T = 4096</text>
+    <text x="512" y="380" fill="#d7b9ff" font-size="13" font-weight="700">200,704 bytes</text>
+    <text x="512" y="462" fill="#d7b9ff" font-size="13" font-weight="700">200,704 bytes</text>
+    <line x1="512" y1="520" x2="866" y2="520" stroke="#273552"/>
+    <text x="512" y="548" fill="#ef9be0" font-size="13" font-weight="700">READ AS</text>
+    <text x="576" y="548" fill="#c8b8d8" font-size="13">constant carried-state footprint</text>
+
+    <rect x="920" y="174" width="426" height="406" rx="24" fill="#0e172c" stroke="#ffd58f" stroke-opacity="0.52"/>
+    <text x="946" y="214" fill="#d7e5ff" font-size="16" font-weight="700" letter-spacing="1.5">IMPLEMENTATION CHECKS</text>
+    <text x="946" y="240" fill="#8fa3c8" font-size="13">Recorded on the current repository</text>
+
+    <rect x="946" y="266" width="174" height="94" rx="16" fill="#14283b" stroke="#5befff" stroke-opacity="0.45"/>
+    <text x="966" y="294" fill="#6cf5ff" font-size="12" font-weight="700" letter-spacing="1">DELTA ERROR</text>
+    <text x="966" y="329" fill="#f4f7ff" font-size="24" font-weight="700">4.17e−7</text>
+    <text x="966" y="348" fill="#9eb1d2" font-size="12">max reference difference</text>
+
+    <rect x="1140" y="266" width="180" height="94" rx="16" fill="#211a3e" stroke="#b78cff" stroke-opacity="0.6"/>
+    <text x="1160" y="294" fill="#d7b9ff" font-size="12" font-weight="700" letter-spacing="1">CHUNK ERROR</text>
+    <text x="1160" y="329" fill="#f4f7ff" font-size="24" font-weight="700">1.55e−6</text>
+    <text x="1160" y="348" fill="#b8abd4" font-size="12">full vs carried state</text>
+
+    <rect x="946" y="386" width="374" height="70" rx="16" fill="#18263b" stroke="#ffd58f" stroke-opacity="0.5"/>
+    <text x="966" y="414" fill="#ffd58f" font-size="12" font-weight="700" letter-spacing="1">TEST SUITE</text>
+    <text x="966" y="441" fill="#f4f7ff" font-size="22" font-weight="700">21 passed</text>
+    <text x="1130" y="441" fill="#aebbd6" font-size="13">pytest tests -q</text>
+
+    <rect x="946" y="480" width="374" height="70" rx="16" fill="#211d3d" stroke="#ef78d5" stroke-opacity="0.5"/>
+    <text x="966" y="508" fill="#ef9be0" font-size="12" font-weight="700" letter-spacing="1">NOT ESTABLISHED</text>
+    <text x="966" y="535" fill="#f4f7ff" font-size="14" font-weight="700">256K training · frontier parity</text>
+  </g>
+
+  <text x="52" y="642" fill="#6cf5ff" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="700" letter-spacing="2">EVIDENCE LEDGER · RESULTS/ · DESIGN.md · TECHNICAL REPORT</text>
+  <text x="1346" y="642" fill="#8295bb" font-family="Inter,Segoe UI,sans-serif" font-size="13" text-anchor="end">SYNTHETIC GATES ≠ GENERAL QUALITY</text>
+</svg>
