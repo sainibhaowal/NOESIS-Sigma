@@ -49,7 +49,7 @@
 
     <rect x="264" y="188" width="164" height="96" rx="18" fill="#15233d" stroke="#6d9cff" stroke-opacity="0.75"/>
     <text x="284" y="222" fill="#a4bdff" font-size="13" font-weight="700" letter-spacing="2">NORMALIZE</text>
-    <text x="284" y="255" fill="#f4f7ff" font-size="21" font-weight="700">u = RMSNorm(x)</text>
+    <text x="284" y="255" fill="#f4f7ff" font-size="18" font-weight="700">u = RMSNorm(x)</text>
     <text x="284" y="275" fill="#93a4c5" font-size="13">clean operator stream</text>
 
     <path d="M226 236 H254" stroke="#6cf5ff" stroke-width="2" marker-end="url(#arrow)"/>
