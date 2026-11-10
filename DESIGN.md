@@ -155,8 +155,8 @@ read_t     = confidence · W_o Σ_j softmax_j(scores / τ_r) V_j
 - a separate **read temperature** `τ_r` (the routing sharpness `τ_w = 0.2 · τ` is not a read
   temperature: a read that is sharp before the addresses are trained picks an arbitrary slot);
 - the **match-confidence gate** above, which multiplies the read by a per-token likelihood ratio.
-  It is a differentiable abstention path: unmatched queries contribute zero, so the residual stream
-  alone answers them;
+  It is a differentiable abstention path: unmatched queries are attenuated toward zero, so the
+  residual stream can answer them;
 - the **novelty floor** `δ` on the write path, which stops the slow leak that fills every slot.
 
 These controls are opt-in (`memory_novelty_floor`, `memory_read_temperature`, `memory_abstain`). The

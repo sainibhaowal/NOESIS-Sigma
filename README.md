@@ -120,7 +120,7 @@ that a learned model has mastered arbitrarily long-range language understanding.
 
 | Check | Recorded result | Interpretation |
 | :--- | :--- | :--- |
-| Chunked delta rule vs. sequential reference | Maximum output/state difference `4.17e−7` | Chunkwise implementation agrees with the reference on the recorded gate |
+| Chunked delta rule vs. sequential reference | Maximum output difference `4.17e−7`; state difference `3.58e−7` | Chunkwise implementation agrees with the reference on the recorded gate |
 | Full forward vs. carried-state chunks | Maximum hidden-state difference `1.55e−6` | State carry is equivalent at the tested split |
 | State size vs. context length | `200704` bytes at both `T = 512` and `T = 4096` | Fixed carried-state footprint for the tiny preset |
 | MQAR associative recall | `0.974` accuracy vs. `0.062` chance after 400 steps | Synthetic recall path is trainable |

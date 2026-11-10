@@ -137,45 +137,88 @@ future configuration.
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-  font=\footnotesize, >=Latex, node distance=3.2mm and 3.5mm,
-  b/.style={draw=sigmaBlue!75, rounded corners=1.5pt, fill=lightBlue, align=center,
-            minimum height=5.6mm, minimum width=13mm},
-  g/.style={draw=sigmaOrange!90, rounded corners=1.5pt, fill=lightOrange, align=center,
-            minimum height=5.6mm, minimum width=13mm},
-  m/.style={draw=sigmaTeal!80, rounded corners=1.5pt, fill=lightTeal, align=center,
-            minimum height=5.6mm, minimum width=13mm},
+  font=\footnotesize, >=Latex, node distance=3.5mm and 4mm,
+  b/.style={draw=sigmaBlue!75, rounded corners=2pt, fill=lightBlue, align=center,
+            minimum height=8mm, text width=27mm},
+  g/.style={draw=sigmaOrange!90, rounded corners=2pt, fill=lightOrange, align=center,
+            minimum height=8mm, text width=34mm},
+  m/.style={draw=sigmaTeal!80, rounded corners=2pt, fill=lightTeal, align=center,
+            minimum height=8mm, text width=31mm},
+  state/.style={draw=black!55, dashed, rounded corners=2pt, fill=white, align=center,
+                minimum height=9mm, text width=39mm},
   a/.style={->, thick, draw=black!70}
 ]
-\node[b] (k) {$k_t$};
-\node[b, right=of k] (route) {softmax\\ routing};
-\node[g, right=of route] (gate) {novelty\\ dead-zone};
-\node[m, right=of gate] (acc) {write\\ accumulators};
-\node[m, right=of acc] (cons) {Bayesian\\ consolidation};
-\node[m, below=6mm of cons] (ring) {prototype\\ ring $K_j,V_j$};
-\draw[a] (k) -- (route);
-\draw[a] (route) -- (gate);
-\draw[a] (gate) -- (acc);
-\draw[a] (acc) -- (cons);
-\draw[a] (cons) -- (ring);
 
-\node[b, below=14mm of k] (q) {$q_t$};
-\node[b, right=of q] (scores) {match\\ $\max_j\cos$};
-\node[g, right=of scores] (conf) {$\sigma(\kappa(m-\theta))$};
-\node[m, right=of conf] (soft) {$\softmax(s/\tau_r)$};
-\node[m, right=of soft] (read) {$\sum_j w_jV_j$};
-\node[b, right=of read] (out) {$c_t\,W_o$};
-\draw[a] (q) -- (scores);
-\draw[a] (scores) -- (conf);
-\draw[a] (conf) -- (soft);
-\draw[a] (soft) -- (read);
-\draw[a] (read) -- (out);
-\draw[a, dashed] (ring.south west) -- (soft.north east);
-\node[align=left, font=\scriptsize, below=2mm of route] {write path};
-\node[align=left, font=\scriptsize, below=2mm of scores, xshift=2mm] {read path (abstains when $m_t$ is small)};
+\node[anchor=west, font=\bfseries\scriptsize, text=sigmaBlue!90] at (0,1.05)
+  {WRITE: per-token evidence and block consolidation};
+\node[b] (winput) {stream input\\$x_t,\ r_t$};
+\node[b, right=of winput] (features)
+  {$k_t=\operatorname{norm}(x_t+W_kx_t)$\\
+   $v_t=W_vr_t,\quad e_t=\sigma(E[x_t;r_t])$};
+\node[g, right=of features] (routing)
+  {novelty and evidence gate\\
+   $g_t=\nu_te_t$\\
+   $a_{tj}=\softmax_j((s^{\rm write}_{tj}
+   -\lambda\log(1+\rho_j))/\tau_w)g_t$};
+\node[m, right=of routing] (acc)
+  {carried accumulators\\
+   $D_j,\ N^K_j,\ N^V_j$\\
+   plus block count};
+\node[g, right=of acc] (consolidate)
+  {at block boundary\\
+   $\eta_j=D_j/(D_j+1)$\\
+   soft update of $K_j,V_j,u_j$};
+\node[state, right=of consolidate] (wstate)
+  {persistent slot state\\
+   $K_j,V_j,u_j$ + accumulators + count};
+
+\draw[a] (winput) -- (features);
+\draw[a] (features) -- (routing);
+\draw[a] (routing) -- (acc);
+\draw[a] (acc) -- (consolidate);
+\draw[a] (consolidate) -- (wstate);
+
+\node[anchor=west, font=\bfseries\scriptsize, text=sigmaTeal!80] at (0,-1.05)
+  {READ: content address with optional abstention};
+\node[b, below=15mm of winput] (rinput)
+  {query input + carried state\\$x_t,\quad S^{\rm slot}=(K,V,u)$};
+\node[b, right=of rinput] (query)
+  {$q_t=\operatorname{norm}(x_t+W_qx_t)$};
+\node[m, right=of query] (rawscore)
+  {address scores\\
+   $s_{tj}=q_t\!\cdot\!K_j$\\
+   $s'_{tj}=s_{tj}+\log\max(u_j,10^{-3})$};
+\node[m, right=of rawscore] (weights)
+  {$w_{tj}=\softmax_j(s'_{tj}/\tau_r)$};
+\node[m, right=of weights] (content)
+  {$r_t=\sum_jw_{tj}V_j$};
+\node[m, right=of content] (gated)
+  {$\widetilde r_t=c_t\,r_t$};
+\node[b, right=of gated] (output)
+  {$\operatorname{read}_t=W_o\widetilde r_t$\\
+   \texttt{readout}};
+\node[g, below=7mm of gated] (confidence)
+  {optional abstention gate\\
+   $m_t=\max_{u_j>10^{-3}}q_t\!\cdot\!K_j$\\
+   $c_t=\sigma(\kappa(m_t-\theta))$\\
+   $\widetilde r_t=c_t r_t$; $c_t=1$ when disabled};
+
+\draw[a] (rinput) -- (query);
+\draw[a] (query) -- (rawscore);
+\draw[a] (rawscore) -- (weights);
+\draw[a] (weights) -- (content);
+\draw[a] (content) -- (gated);
+\draw[a] (gated) -- (output);
+\draw[a] (confidence.north) -- node[right, font=\scriptsize] {gate} (gated.south);
 \end{tikzpicture}}
-\caption{Slot memory with per-token gated writes (top) and a gated read (bottom). The write
-path applies a novelty dead-zone before the accumulator; the read path multiplies the address
-distribution by a learned match-confidence factor, so an unmatched query contributes zero.}
+\caption{Slot memory implementation, separated into its two causal paths. The write path forms
+per-token keys, values, and evidence, computes novelty-aware assignments, accumulates them across
+a fixed block, and then performs the soft consolidation update. The read path uses the carried
+keys, values, and usage: the usage bias is added before the read softmax, while the optional
+match-confidence gate is computed from the raw address score and applied to the value mixture
+before the linear readout (equivalent to the displayed scalar form).
+Dashed outlines mark state that is carried across calls; the figure does not draw a shortcut from
+a write into the same token's read.}
 \label{fig:slot}
 \end{figure*}
 

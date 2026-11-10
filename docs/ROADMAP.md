@@ -2,18 +2,19 @@
 
 ## Realistic hardware envelope
 
-Target: 2 × T4 (16 GB each, no native bf16 → fp16 + gradient scaler). This supports research up to
-roughly 100–300M parameters with short sequences, and smoke training at longer context. It does not
-support a 1.5B run: parameters alone are ~3 GB in fp16, AdamW fp32 states add ~12 GB, and the
-activations for a 8K chunk do not fit alongside.
+Planning target: 2 × T4 (16 GB each, no native bf16 → fp16 + gradient scaler). This is a rough
+planning envelope for research up to roughly 100–300M parameters with short sequences, plus smoke
+training at longer context; it is not a measured capacity guarantee. It does not support a 1.5B run:
+parameters alone are ~3 GB in fp16, AdamW fp32 states add ~12 GB, and the activations for an 8K
+chunk do not fit alongside.
 
 Approximate per-GPU budget:
 
-| Model | Params | fp16 weights | AdamW states | Fits on 16 GB? |
+| Preset / planning size | Current or planned params | fp16 weights | AdamW states | Fits on 16 GB? |
 | :--- | ---: | ---: | ---: | :--- |
-| tiny | 1.6M | 3 MB | 13 MB | yes, trivially |
-| 20M | 20M | 40 MB | 160 MB | yes |
-| 100M | 100M | 200 MB | 800 MB | yes |
+| tiny preset | 2.08M | 4.2 MB | 16.6 MB | yes, trivially |
+| 20M preset | 20.97M | 41.9 MB | 167.7 MB | yes |
+| 100M preset | 142.11M | 284.2 MB | 1.14 GB | yes, small batch |
 | 300M | 300M | 600 MB | 2.4 GB | yes, small batch |
 | 1.5B | 1.5B | 3 GB | 12 GB | no |
 
@@ -40,7 +41,7 @@ block), constant state, MQAR ≥ 0.9. All pass.
 Results are written to `results/ladder.md`. These are small CPU experiments; they establish
 mechanism-level behaviour, not language quality or frontier parity.
 
-## Stage 1 — 20M character/subword model, 8K context
+## Stage 1 — 20M byte-level-BPE model, 8K context
 
 Goal: a model that produces coherent text at all, and a loss curve that behaves.
 

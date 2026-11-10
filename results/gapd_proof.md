@@ -1,8 +1,8 @@
 # Gap D proof: the slot read is a gated address
 
 Measured 2026-11-06 on CPU (`torch 2.15.0+cpu`). The Kaggle weekly GPU quota (30 h) was exhausted,
-so every arm was re-run locally with identical data, seeds, optimizer and steps; the GPU kernel in
-`kaggle/gapd/run.py` stages the same three-arm experiment and is ready to push when quota resets.
+so every arm was re-run locally with identical data, seeds, optimizer and steps. The GPU kernel in
+`kaggle/gapd/run.py` is available for a future rerun; this record contains no GPU result.
 Raw numbers: [gapd_proof.json](gapd_proof.json).
 
 ## The defect
@@ -28,8 +28,8 @@ with cosine +1.000. The failure was in the read/write gates, not the key represe
 ## The fix
 
 All three changes are opt-in (`memory_novelty_floor`, `memory_read_temperature`,
-`memory_abstain`); defaults preserve the previous behaviour and every existing checkpoint loads
-unchanged.
+`memory_abstain`). The default configuration preserves the previous behavior; checkpoint
+compatibility must still be verified against each saved architecture configuration.
 
 ### 1. Novelty dead-zone on writes
 
@@ -38,14 +38,14 @@ gate_t  = [(novelty_t − δ) / (1 − δ)]₊ · evidence_t          δ = memor
 novelty = 1 − max_j cos(k_t, K_j)                            (second pass: vs earlier writes in-block)
 ```
 
-Below `δ` the write weight is exactly zero and the gradient is unchanged above it, so the redundancy
-filter is exact rather than a heuristic damping factor.
+Below `δ` the write weight is exactly zero; above it, the novelty is linearly rescaled, so the
+redundancy filter is an explicit dead-zone rather than a heuristic damping factor.
 
 ### 2. Separate read temperature
 
 `τ_r = 0.1` (`memory_read_temperature`), independent of the routing sharpness `τ_w = 0.2 · τ`. A
 read that is sharp before the addresses are trained picks an arbitrary slot; the read temperature is
-learned separately and only sharpens the final address distribution.
+configured separately and only sharpens the final address distribution.
 
 ### 3. Match-confidence abstention
 
@@ -55,8 +55,9 @@ confidence = σ(κ · (match_t − θ))                        # learned κ (ini
 read_t     = confidence · W_o Σ_j softmax_j(scores / τ_r) V_j
 ```
 
-The read is multiplied by a differentiable per-token likelihood ratio. Unmatched queries contribute
-zero and the residual stream alone answers them; matched queries pass at full scale.
+The read is multiplied by a differentiable per-token likelihood ratio. Unmatched queries are
+attenuated toward zero so the residual stream can answer them; matched queries receive a larger
+read contribution.
 
 ## 1. Presence recall — the capability the slot memory is for
 
@@ -68,7 +69,7 @@ task by collapsing the embeddings. Chance 0.50. 800 steps, 3 seeds, identical da
 | :--- | ---: | ---: | ---: | ---: |
 | cosine (previous behaviour) | 0.562 | 0.539 | 0.555 | 0.552 |
 | ZCA-whitened metric alone | 0.648 | 0.531 | 0.539 | 0.573 |
-| **gated (shipped)** | **0.977** | **1.000** | **0.953** | **0.977** |
+| **gated (implemented variant)** | **0.977** | **1.000** | **0.953** | **0.977** |
 
 Seed-0 diagnostics (16 slots, uniform entropy `ln 16 = 2.773` nats):
 
@@ -121,7 +122,7 @@ TinyStories token stream**, held-out split.
 | **gated** | **3.0826** | **21.82** |
 
 A difference of 0.0066 nats (0.2%), inside the run-to-run seed spread; the training curves overlap
-throughout. The gated mechanism does not degrade language modelling.
+throughout. This single check did not show a meaningful language-modelling degradation.
 
 ## Gates and unit tests
 
@@ -157,10 +158,10 @@ The three arms are defined in `VARIANTS` in [scripts/gapd_proof.py](../scripts/g
 
 ## Limitations
 
-- CPU run. The GPU kernel ([kaggle/gapd/run.py](../kaggle/gapd/run.py)) reproduces this at 1200
-  steps once quota resets; the presence result is already at ceiling (1.000 on seed 1) and further
-  steps cannot change the conclusion for the previous arms, which stay at chance.
-- The 20M TinyStories checkpoint predates the fix; a gated 20M no-regression run is staged but not
-  executed (GPU quota). The 3M real-data LM check above is the available no-regression evidence.
+- CPU run. The GPU kernel ([kaggle/gapd/run.py](../kaggle/gapd/run.py)) is configured to rerun the
+  same proof at 1200 steps, but no GPU result is included in this record.
+- The 20M TinyStories checkpoint predates the fix. A gated 20M no-regression run is staged in
+  `configs/sigma_20m_gapd.json` and `kaggle/gapd_train/`, but no resulting 20M checkpoint is included.
+  The 3M real-data LM check above is the available no-regression evidence.
 - The aggregate task is seed-noise-limited at these budgets; treat it as a guard, not a measurement
   of the summary ring's quality.

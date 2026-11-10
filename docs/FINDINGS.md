@@ -1,9 +1,11 @@
-# Findings: what the legacy code actually does, and what was kept
+# Findings from the earlier prototype
 
-This is the written answer to "read `Archive_Legacy/Core/OSC` and tell me what you find". It is an
-audit, not a wish list.
+This document records conclusions from an earlier local audit of the Sigma prototype and its energy
+engine. The `Archive_Legacy/` snapshots referenced by the original audit are not included in this
+checkout, so the historical findings below are context rather than claims that can be reproduced from
+the current tree. Current measurements are recorded in `results/` and in the technical report.
 
-## 1. `Archive_Legacy/Core/Sigma` — v1 of your law
+## 1. Earlier Sigma prototype — v1 of the law
 
 **Good parts, kept.**
 
@@ -23,19 +25,19 @@ audit, not a wish list.
 | the controller computes **all** operators then mixes them | same time with a gate at 0 | "budget" is decorative |
 | energy is a linear decay | `diagonal` term only | `-∇E` is not doing associative work |
 | 8 slots, no novelty/evidence gate | fixed writes | memory is overwritten by repeated content |
-| single-position recurrence, no chunk form | sequential state update | cannot process a 256K context |
+| single-position recurrence, no chunk form | sequential state update | no tested chunkwise long-context contract |
 
 SigmaStorm keeps the vocabulary and rebuilds the execution: chunkwise delta rule with a per-head
 decay spectrum and expanded state, per-token gated slot writes consolidated every `slot_block`
 tokens, a chunk-summary global path, convex gated mixture, real SwiGLU FFN, MTP heads.
 
-## 2. `Archive_Legacy/Core/OSC` — the energy engine
+## 2. Earlier OSC energy engine
 
 **What it is.** An operator-split integrator: skew rotation, ICNN-proximal dissipation, norm-ball
 projection, plus snapshots and telemetry. It is an *engine*, and the README says so: no tokenizer,
 no language model, no training loop.
 
-**What the README itself admits (§11, verbatim):**
+**The earlier audit recorded these README statements:**
 
 1. "No trainer updates `K`; the default is a random low-rank skew matrix."
 2. "The ICNN enforces strong convexity (`c_min=0.01`), so a fixed input has one equilibrium. Do not
@@ -68,21 +70,24 @@ Five independent defects. Each was isolated with an ablation; all five are docum
 5. **Operator outputs had wildly different scales** and were summed raw, so the largest one
    dominated its gate.
 
-After the fixes, MQAR goes from 6.2% to 97.3% with the full stack in 400 CPU steps.
+The current mechanism gate records MQAR accuracy `0.974` versus `0.062` chance after 400 steps.
+The separate ladder record reports `0.977` on its 26-binding task; these are different protocols and
+should not be combined into one number.
 
 ## 4. The two reference papers
 
-Both PDFs sit in the project root. Reading them against SigmaStorm:
+The two frontier reports mentioned by the earlier audit are not bundled in this repository. Their
+bibliographic records are in [`docs/paper/references.bib`](paper/references.bib). The comparison below
+is related-work context, not a measurement of SigmaStorm.
 
 ### `2607.24653v2.pdf` — Kimi K3 family
 
 - A 3:1 hybrid of KDA (Kimi Delta Attention, a gated delta-rule variant) and Gated MLA.
 - Stable LatentMoE and a 1M-token context claim.
 
-**Take-away for us.** The industry is converging on the delta rule as the linear-time recall
-operator; our operator is the same family. What they have that we do not is data and compute — not
-a different mechanism. The 1-in-4 window-attention block in SigmaStorm mirrors the hybrid idea
-without any full attention.
+**Take-away for us.** Kimi K3 is related work using a gated delta-rule family alongside another
+sequence-mixing path. SigmaStorm uses its own chunkwise delta-rule implementation and an optional
+local window; this is a family-level comparison, not an equivalence or performance claim.
 
 ### `2609.19969v1.pdf` — DeepSeek-V4.1-Flash technical report
 
@@ -93,15 +98,17 @@ without any full attention.
 wrong: the PDF is a real technical report for DeepSeek-V4.1-Flash, and it is the closest frontier
 reference point for long-context sparse attention plus MTP.
 
-**Take-away for us.** Their long-context strategy is still attention with compressed KV and a
-token-selection indexer. SigmaStorm replaces that with bounded recurrent state. Ours is cheaper per
-token at long context; theirs has an exact retrieval path we approximate. MTP (our `mtp_horizons`)
-is the same idea as DSpark: train extra heads on future offsets to densify the gradient signal.
+**Take-away for us.** The report describes compressed/sparse attention and multi-token prediction as
+related design points. SigmaStorm instead uses bounded recurrent state with optional local window
+attention. No matched cost, quality, or retrieval comparison with that system has been measured here.
+The `mtp_horizons` heads are a related multi-token-prediction mechanism, not a claim of identical
+implementation.
 
 ## 5. What this means for the ambition
 
-- **Mechanism:** validated. Recall, chunk invariance, constant state, trainable end to end.
-- **Frontier performance:** not reachable on 2 × T4. A 1.5B model needs ~3 GB of parameters and
+- **Mechanism:** mechanism-level gates establish recall on the synthetic tasks, chunk invariance for
+  the tested split, constant state-tensor size at the tested lengths, and end-to-end trainability.
+- **Frontier performance:** not established by this repository. A 1.5B model needs ~3 GB of parameters and
   12 GB of optimizer state *before* activations; a single 16 GB card cannot hold it, and the
   data budget for frontier-adjacent quality is far beyond this hardware. The honest path is
   small-model validation → 100M → 300M, and measuring whether the recurrence scales. See

@@ -1,6 +1,6 @@
 # 20M TinyStories run — 2 × T4, two sessions
 
-Model: `configs/sigma_20m.json` (20,996,090 parameters, all operators on: conv, decay-spectrum delta
+Model: `configs/sigma_20m.json` (20,965,370 parameters in the current configuration; all operators on: conv, decay-spectrum delta
 rule with `state_expand=2`, slot memory, window attention, chunk summaries, energy contraction,
 MTP horizons 2/4).
 
@@ -37,8 +37,8 @@ what was wrong. Tom told her about his lost toy. His mother comforted him and sa
 it together. They searched all around the house, but it was nowhere to be found.
 ```
 
-This is a usable 20M TinyStories model: grammatical, on-genre, and locally coherent. It is not
-evidence of long-horizon recall; see below.
+The recorded samples are grammatical, on-genre, and locally coherent. They are not evidence of
+long-horizon recall; see below.
 
 ## Slot memory audit (this checkpoint)
 
@@ -103,5 +103,5 @@ confidence separates present (0.56) from absent (0.03) queries. MQAR is unchange
 The full measurements, diagnostics and reproduction command are in
 [gapd_proof.md](gapd_proof.md) and [gapd_proof.json](gapd_proof.json); the mechanism is described in
 §3.3 of [DESIGN.md](../DESIGN.md). This 20M checkpoint predates the fix, so its samples and slot
-audit above are unchanged; a gated 20M no-regression run (`configs/sigma_20m_gapd.json`,
-`kaggle/gapd_train`) is staged for when the Kaggle GPU quota resets.
+audit above are unchanged. No gated 20M language-model checkpoint is recorded here; the run is
+staged in `configs/sigma_20m_gapd.json` and `kaggle/gapd_train/` for a future controlled rerun.

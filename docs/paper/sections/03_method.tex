@@ -5,58 +5,183 @@
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
+  font=\footnotesize, >=Latex, node distance=5mm and 7mm,
+  io/.style={draw=sigmaBlue!80, rounded corners=2pt, fill=lightBlue, align=center,
+             minimum height=11mm, text width=29mm},
+  core/.style={draw=sigmaTeal!80, rounded corners=2pt, fill=lightTeal, align=center,
+               minimum height=11mm, text width=32mm},
+  block/.style={draw=sigmaBlue!75, rounded corners=2pt, fill=lightBlue, align=center,
+                minimum height=10mm, text width=54mm, font=\scriptsize},
+  stack/.style={draw=sigmaBlue!85, rounded corners=3pt, dashed, inner sep=4mm,
+                label={[sigmaBlue!90, font=\footnotesize]above:repeated SigmaBlock stack}},
+  head/.style={draw=sigmaOrange!90, rounded corners=2pt, fill=lightOrange, align=center,
+               minimum height=11mm, text width=39mm},
+  aux/.style={draw=black!55, rounded corners=2pt, fill=white, align=center,
+              minimum height=11mm, text width=42mm},
+  state/.style={draw=black!55, dashed, rounded corners=2pt, fill=white, align=center,
+                minimum height=12mm, text width=82mm, font=\scriptsize},
+  arrow/.style={->, thick, draw=black!70},
+  dashedarrow/.style={->, thick, dashed, draw=sigmaOrange!90},
+  statearrow/.style={<->, thick, dashed, draw=black!55}
+]
+
+\node[io] (ids) {input token ids\\$x_{1:T}$};
+\node[core, right=of ids] (embed) {token embedding\\$X=E[x_{1:T}]$};
+
+\node[block, right=14mm of embed] (blk0) {block $\ell=0$: SigmaTransition\\
+  parallel stateful operators $\rightarrow$ FFN/MoE residual};
+\node[block, below=2mm of blk0] (blk1) {block $\ell=1$: SigmaTransition\\
+  parallel stateful operators $\rightarrow$ FFN/MoE residual};
+\node[block, below=2mm of blk1] (blkmid) {$\vdots$\\
+  same block law; configured operator schedule};
+\node[block, below=2mm of blkmid] (blkL) {block $\ell=L-1$: SigmaTransition\\
+  parallel stateful operators $\rightarrow$ FFN/MoE residual};
+\begin{scope}[on background layer]
+  \node[stack, fit=(blk0)(blkL)] (stackframe) {};
+\end{scope}
+
+\node[core, right=13mm of stackframe] (finalnorm) {final RMSNorm\\$H=\rms(x^{(L)})$};
+\node[core, right=of finalnorm] (hidden) {final hidden states\\$H\in\mathbb{R}^{B\times T\times d}$};
+
+\draw[arrow] (ids) -- (embed);
+\draw[arrow] (embed.east) -- (blk0.west);
+\draw[arrow] (stackframe.east) -- (finalnorm.west);
+\draw[arrow] (finalnorm) -- (hidden);
+\draw[arrow] (blk0) -- (blk1);
+\draw[arrow] (blk1) -- (blkmid);
+\draw[arrow] (blkmid) -- (blkL);
+
+\node[state, below=9mm of stackframe] (state)
+  {per-block carried state $S_t^{(0:L-1)}$:
+   conv tail; delta-rule matrices + previous token; slot keys/values/usage and
+   write accumulators; optional summary ring and local-window ring.
+   State is read and updated by each block, then carried to the next caller chunk.};
+\draw[statearrow] (stackframe.south) -- node[right, font=\scriptsize] {read / update} (state.north);
+
+\node[head, below=13mm of hidden, xshift=-45mm] (lmhead)
+  {next-token head\\
+   logits $=H W_E^{\top}$\\
+   tied to $E$ when configured};
+\node[head, below=13mm of hidden] (mtp)
+  {multi-token heads\\
+   $P_2H,\ P_4H$\\
+   reuse the same LM head};
+\node[aux, below=13mm of hidden, xshift=45mm] (telemetry)
+  {block telemetry\\
+   MoE auxiliary loss and route entropy};
+\node[aux, below=10mm of mtp] (loss)
+  {pretraining objective\\
+   LM CE + weighted MTP + configured auxiliary terms};
+\node[io, below=of loss] (optim)
+  {scaled backward\\
+   clip $\rightarrow$ AdamW update};
+
+\draw[arrow] (hidden.south) -| (lmhead.north);
+\draw[arrow] (hidden.south) -- (mtp.north);
+\draw[arrow] (hidden.south) -| (telemetry.north);
+\draw[dashedarrow] (lmhead.south) |- (loss.west);
+\draw[dashedarrow] (mtp.south) -- (loss.north);
+\draw[dashedarrow] (telemetry.south) |- (loss.east);
+\draw[arrow] (loss) -- (optim);
+
+\node[anchor=west, font=\bfseries\scriptsize, text=sigmaBlue!90] at (0,2.2)
+  {FULL SIGMASTORM MODEL AND PRETRAINING INTERFACE};
+\end{tikzpicture}}
+\caption{Top-level SigmaStorm architecture used for pretraining. Token ids are embedded and
+passed through $L$ SigmaBlocks; each block applies the stateful SigmaTransition and then a
+state-free gated FFN or sparse-MoE residual. The block-local state is carried across caller
+chunks, while depth is the repeated transition stack. The final normalised hidden states feed
+the tied language-model head and the configured multi-token prediction projections; block
+telemetry contributes the auxiliary terms shown in the pretraining objective. The diagram is
+the implemented model interface, not an instruction-tuning, preference-optimisation, or
+frontier-scale system diagram.}
+\label{fig:full-architecture}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
   font=\small, >=Latex, node distance=4mm and 6mm,
   box/.style={draw=sigmaBlue!80, rounded corners=2pt, fill=lightBlue, align=center,
-              minimum height=8mm, minimum width=19mm},
+              minimum height=9mm, minimum width=23mm},
   op/.style={draw=sigmaTeal!80, rounded corners=2pt, fill=lightTeal, align=center,
-             minimum height=7mm, minimum width=18mm, font=\footnotesize},
+             minimum height=8mm, minimum width=22mm, text width=22mm, font=\footnotesize},
   ctrl/.style={draw=sigmaOrange!90, rounded corners=2pt, fill=lightOrange, align=center,
-               minimum height=8mm, minimum width=24mm},
+               minimum height=10mm, minimum width=31mm, text width=31mm, font=\footnotesize},
+  mix/.style={draw=sigmaOrange!90, rounded corners=2pt, fill=lightOrange, align=center,
+              minimum height=12mm, minimum width=36mm, text width=36mm, font=\footnotesize},
   state/.style={draw=black!45, dashed, rounded corners=2pt, fill=white, align=center,
-                minimum height=9mm, minimum width=32mm, font=\footnotesize},
+                minimum height=13mm, minimum width=65mm, text width=65mm, font=\footnotesize},
+  advancebox/.style={draw=sigmaBlue!80, rounded corners=2pt, fill=lightBlue, align=center,
+                     minimum height=14mm, minimum width=43mm, text width=43mm, font=\footnotesize},
+  output/.style={draw=sigmaBlue!80, rounded corners=2pt, fill=lightBlue, align=center,
+                 minimum height=15mm, minimum width=48mm, text width=48mm, font=\footnotesize},
   arrow/.style={->, thick, draw=black!70},
   darrow/.style={->, thick, draw=sigmaTeal!80},
-  carrow/.style={->, thick, draw=sigmaOrange!90},
-  statearrow/.style={<->, dashed, draw=black!55}
+  controlarrow/.style={->, thick, dashed, draw=sigmaOrange!90},
+  statearrow/.style={<->, thick, dashed, draw=black!55}
 ]
-\node[box] (tok) {token ids};
-\node[box, right=of tok] (embed) {embedding\\+ residual $x$};
-\node[box, right=of embed, fill=lightOrange] (norm) {$u=\rms(x)$};
-\node[op, above right=10mm and 12mm of norm] (conv) {ShortConv};
-\node[op, right=of conv] (delta) {delta rule};
-\node[op, below=3mm of delta] (slot) {slot memory};
-\node[op, below=3mm of slot] (summ) {summary ring};
-\node[op, below=3mm of summ] (win) {window (1/4)};
-\node[ctrl, right=18mm of slot] (ctrl) {controller\\independent sigmoid gates\\$\Delta t(u)$};
-\node[ctrl, right=of ctrl] (mix) {gate-normalised mixture\\$m-\mathrm{grad}\,E(u)+u$};
-\node[box, right=of mix] (proj) {$v=\Proj(\cdot)$};
-\node[box, right=of proj] (out) {$W_o v$};
-\node[box, right=of out] (add) {$x'=x+W_o v$};
-\node[state, below=13mm of summ] (state) {carried state: conv tail, delta matrices, slot prototypes and accumulators,\\
-summary ring and partial chunk, window ring, previous normalised token};
+\node[box] (tok) {token ids\\$\longrightarrow$ embedding};
+\node[box, right=of tok] (residual) {residual stream\\$x^{(\ell)}_t$};
+\node[box, right=of residual, fill=lightOrange] (norm) {$u_t=\rms(x^{(\ell)}_t)$};
 
-\draw[arrow] (tok) -- (embed);
-\draw[arrow] (embed) -- (norm);
-\foreach \op in {conv,delta,slot,summ,win} {
-  \draw[darrow] (norm.east) -| (\op.west);
-  \draw[darrow] (\op.east) -| (mix.west);
-  \draw[statearrow] (state.north) -| (\op.south);
-}
-\draw[carrow] (norm.east) |- (ctrl.west);
-\draw[carrow] (ctrl) -- (mix);
-\draw[arrow] (mix) -- (proj);
-\draw[arrow] (proj) -- (out);
-\draw[arrow] (out) -- (add);
-\draw[arrow] (embed.east) |- (add.south);
+% These cards are one parallel stage, not a sequential chain.
+\node[op, right=10mm of norm, yshift=5mm] (conv) {ShortConv\\$d_{\rm conv}$};
+\node[op, right=2mm of conv] (delta) {gated delta\\$d_{\rm delta}$};
+\node[op, right=2mm of delta] (memory) {slot memory\\$d_{\rm mem}$};
+\node[op, below=3mm of conv] (summary) {chunk summary\\$d_{\rm sum}$};
+\node[op, right=2mm of summary] (window) {local window\\$d_{\rm win}$\\(1 block / 4)};
+\node[draw=sigmaTeal!80, dashed, rounded corners=3pt, inner sep=4mm,
+      fit=(conv)(delta)(memory)(summary)(window),
+      label={[sigmaTeal, font=\footnotesize, yshift=2mm]above:parallel operator bank}]
+      (operatorbank) {};
 
-\node[draw=sigmaOrange!60, dashed, rounded corners, fit=(conv)(delta)(slot)(summ)(win), inner sep=2.5mm,
-      label={[sigmaOrange, font=\footnotesize, yshift=2mm]above left:parallel operator bank}] {};
+\node[mix, right=9mm of operatorbank] (mix)
+  {$\bar d_t=\dfrac{\sum_i g_{i,t}\,\rms(d_{i,t})}
+                 {\max(\sum_i g_{i,t},\,10^{-6})}$\\[-1mm]
+   \scriptsize gate-normalised proposal};
+\node[ctrl, above=7mm of mix] (ctrl)
+  {$g_{i,t}=\sigma(\mathrm{route}_i(u_t))$\\[-1mm]
+   $s_t=\sigma(\mathrm{step}(u_t))$};
+
+\node[advancebox, below=12mm of mix] (advance)
+  {$\eta_t=\Delta t(0.5+s_t)$\\
+   $z_t=u_t+\eta_t[\bar d_t-\nabla E(u_t)+u_t]$};
+\node[box, right=6mm of advance, minimum width=28mm, text width=28mm] (project)
+  {$v_t=\Proj(z_t)$\\[-1mm]
+   \scriptsize $\|v_t\|\le R$};
+\node[output, right=6mm of project] (blockout)
+  {$x_t^+=x_t+\mathrm{Dropout}(W_o v_t)$\\[-1mm]
+   $x^{(\ell+1)}_t=x_t^+ + F(\rms(x_t^+))$\\[-1mm]
+   \scriptsize $F$: gated FFN or sparse MoE};
+
+\node[state, below=10mm of operatorbank] (state)
+  {carried per-block state $S_t\leftrightarrow S_{t+1}$:
+   \texttt{conv\_tail}; \texttt{ssm} + previous normalised token;
+   slot keys/values + write accumulators; summary ring + partial chunk;
+   local-window key/value ring + length};
+
+\draw[arrow] (tok) -- (residual);
+\draw[arrow] (residual) -- (norm);
+\draw[darrow] (norm) -- node[above, font=\scriptsize] {$u_t$} (operatorbank.west);
+\draw[darrow] (operatorbank.east) -- (mix.west);
+\draw[controlarrow] (norm.north) |- node[pos=0.25, above, font=\scriptsize] {control} (ctrl.west);
+\draw[controlarrow] (ctrl.south) -- (mix.north);
+\draw[arrow] (mix.south) -- (advance.north);
+\draw[arrow] (advance) -- (project);
+\draw[arrow] (project) -- (blockout);
+\draw[statearrow] (operatorbank.south) -- node[right, font=\scriptsize, align=left]
+  {read / update\\operator-local only} (state.north);
 \end{tikzpicture}}
-\caption{Implemented SigmaStorm dataflow. The normalised latent $u$ is sent to the enabled
-operators in parallel; each operator reads and updates only its own carried state. The controller
-produces independent gates and the step size, the gate-normalised mixture is combined with the
-energy gradient and latent residual, and the projected proposal is added to the residual stream.
-The diagram is a dataflow contract, not a literal tensor-layout drawing.}
+\caption{Implemented SigmaStorm block dataflow. The residual stream is normalised once and offered
+to the enabled operators in parallel; the operator cards are not sequential layers. Each operator
+reads and updates only its own fixed-size carried state. The controller emits independent sigmoid
+gates and a step signal. Per-operator RMS-normalised proposals are gate-normalised, combined with
+the learned energy contraction and the latent residual, projected onto the radius-$R$ ball, and
+added back through $W_o$. The resulting transition is followed by the state-free gated FFN or
+sparse MoE residual. The state rail lists the actual fields carried across caller chunks; the
+figure is a dataflow contract, not a literal tensor-layout drawing.}
 \label{fig:architecture}
 \end{figure*}
 
@@ -189,31 +314,148 @@ Field & Shape / content \\
 \subsection{Streaming forward and update lifecycle}
 \label{sec:algorithm}
 
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
-\fbox{\begin{minipage}{0.94\textwidth}
-\textbf{Algorithm 1: carried-state training step.}
-\begin{enumerate}[leftmargin=1.6em]
-\item Initialise the block states once at the beginning of a sequence. Do not reset them at a
-      caller-defined micro-chunk boundary.
-\item For each micro-chunk, run every block from the incoming state. Within a block, compute
-      $u=\rms(x)$, evaluate the enabled operators from $u$ and their carried states, form the
-      gate-normalised mixture, apply the energy step and bounded projection, then add the
-      projected proposal to the residual stream. Return the updated state with the chunk output.
-\item Accumulate language-model and configured multi-token-prediction losses from flat token
-      slices. Repeat for \texttt{bptt\_chunks} micro-chunks while carrying the forward state.
-\item Detach the carried state at the truncated-backpropagation boundary, backpropagate the
-      accumulated loss, unscale and clip gradients when using mixed precision, then perform the
-      optimiser update and clear the accumulation window.
-\item Save checkpoints at the configured cadence, including the architecture configuration and
-      optimiser state needed to resume. Evaluation and generation carry state across chunks but
-      do not perform optimiser updates.
-\end{enumerate}
-\end{minipage}}
-\caption{The implemented streaming lifecycle. State detachment limits gradient history; it does
-not reset the forward memory. The algorithm describes the current training/evaluation interface,
-not an instruction-tuning or preference-optimisation pipeline.}
-\label{fig:stream-algorithm}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\footnotesize, >=Latex, node distance=5mm and 6mm,
+  stage/.style={draw=sigmaBlue!80, rounded corners=2pt, fill=lightBlue,
+                align=center, minimum height=11mm, text width=29mm},
+  statebox/.style={draw=sigmaTeal!80, rounded corners=2pt, fill=lightTeal,
+                   align=center, minimum height=11mm, text width=31mm},
+  control/.style={draw=sigmaOrange!90, rounded corners=2pt, fill=lightOrange,
+                  align=center, minimum height=11mm, text width=31mm},
+  terminal/.style={draw=black!55, rounded corners=2pt, fill=white,
+                  align=center, minimum height=11mm, text width=29mm},
+  flow/.style={->, thick, draw=black!70},
+  memory/.style={<->, thick, dashed, draw=sigmaTeal!85},
+  side/.style={->, thick, dashed, draw=sigmaOrange!90}
+]
+\node[stage] (sample) {packed shards\\sample $[B,T{+}1]$};
+\node[stage, right=of sample] (split) {$\texttt{inputs}=tokens[:,:-1]$\\
+  $\texttt{targets}=tokens[:,1:]$};
+\node[statebox, right=of split] (init) {$S\leftarrow$\\
+  \texttt{initial\_state}(B)};
+\node[stage, right=of init] (forward) {each micro-chunk\\
+  $(h,S,\mathrm{extra})\leftarrow$\\
+  \texttt{model}(x,S)};
+\node[control, right=of forward] (loss) {$\ell_{\mathrm{seg}}\leftarrow$\\
+  \texttt{loss\_from\_hidden}\\
+  + configured terms};
+\node[control, right=of loss] (window) {accumulate\\
+  $\ell_{\mathrm{window}}$\\
+  for $\texttt{bptt\_chunks}$};
+\node[stage, right=of window] (backward) {scaled backward\\
+  on $\ell_{\mathrm{window}}$};
+\node[statebox, right=of backward] (detach) {$S\leftarrow\operatorname{detach}(S)$\\
+  gradient history ends;\\
+  forward memory remains};
+
+\node[terminal, below=13mm of window] (update) {after all gradient-accumulation\\
+  micro-batches: unscale $\rightarrow$ clip\\
+  $\rightarrow$ AdamW step $\rightarrow$ scaler update};
+\node[terminal, right=of update] (save) {periodic or tail checkpoint:\\
+  model, optimiser, scaler, step,\\
+  data cursor, and RNG};
+\node[terminal, below=13mm of forward] (eval) {evaluation / generation:\\
+  same carried-state forward\\
+  without optimiser updates};
+
+\draw[flow] (sample) -- (split);
+\draw[flow] (split) -- (init);
+\draw[flow] (init) -- (forward);
+\draw[flow] (forward) -- (loss);
+\draw[flow] (loss) -- (window);
+\draw[flow] (window) -- (backward);
+\draw[flow] (backward) -- (detach);
+\draw[memory] (detach.south) to[out=270,in=270]
+  node[below, align=center, font=\scriptsize] {next BPTT window; repeat until the configured\\
+  sequence and gradient-accumulation work is complete} (forward.south);
+\draw[flow] (window.south) -- (update.north);
+\draw[flow] (update) -- (save);
+\draw[side] (forward.south) -- node[right, font=\scriptsize] {no backward} (eval.north);
+\end{tikzpicture}}
+\caption{Implemented streaming training lifecycle. A sampled sequence receives one initial carried
+state, which is passed through every micro-chunk and every truncated-backpropagation window. The
+state is detached only after a window backward pass: this truncates gradient history but does not
+reset forward memory. Optimiser work occurs only after gradient accumulation; evaluation and
+generation use the same carried-state forward interface without an optimiser update.}
+\label{fig:streaming}
+\end{figure*}
+
+\begin{figure*}[!t]
+\centering
+\begin{minipage}{0.96\textwidth}
+\hrule\vspace{1mm}
+\refstepcounter{algorithm}
+\textbf{Algorithm \thealgorithm: \texttt{train\_worker} (code-level pseudocode).}\\[-1mm]
+\scriptsize
+\begin{verbatim}
+INPUT: architecture A, training config C, packed token shards D
+OUTPUT: latest checkpoint {model, optimizer, scaler, step, data, rng}
+
+device    <- cuda(rank) if CUDA is available else cpu
+precision <- resolve_precision(C.precision, device)
+model     <- SigmaStorm(A).to(device)
+optimizer <- AdamW(parameter_groups(model), lr=C.lr, betas=(.9, .95))
+scaler    <- GradScaler(enabled=(precision == "fp16"))
+shards    <- PackedShards(C.data_dir, rank, world_size, seed=C.seed)
+step      <- load_latest_if_compatible(C.resume, model, optimizer, scaler, shards)
+last_done <- step
+
+for step in range(step, C.total_steps):
+    if wall_clock_expired(C.max_hours):
+        break
+    optimizer.zero_grad(set_to_none=True)
+    set_learning_rate(optimizer, lr_at(step, C))
+    T <- seq_len_at(step, C)
+    starts <- range(0, T, C.micro_chunk)
+    local_tokens <- C.batch_size * T * C.grad_accum
+
+    for accum in range(C.grad_accum):
+        tokens <- shards.sample(C.batch_size, T + 1).to(device)
+        inputs, targets <- tokens[:, :-1], tokens[:, 1:]
+        state <- model.initial_state(C.batch_size, device)
+
+        for window_start, window in chunks_with_index(starts, C.bptt_chunks):
+            window_loss <- 0
+            for index, segment in enumerate(window):
+                end <- segment + C.micro_chunk
+                sync <- (world_size == 1 or
+                         (accum == C.grad_accum - 1 and
+                          index == len(window) - 1 and
+                          window_start + len(window) == len(starts)))
+                with no_sync_if_needed(sync), autocast(precision, device):
+                    hidden, state, extra <- model(inputs[:, segment:end], state)
+                    terms <- model.loss_from_hidden(
+                        hidden, targets[:, segment:end], mask=None, extra=extra)
+                    loss <- weighted_loss(terms, C, local_tokens, step)
+                window_loss <- window_loss + loss
+            scaler.scale(window_loss).backward()
+            state <- detach(state)       # truncate gradients, keep forward memory
+
+    scaler.unscale_(optimizer)
+    clip_grad_norm_(model.parameters(), C.clip)
+    scaler.step(optimizer)
+    scaler.update()
+    last_done <- step + 1
+    if is_main(rank) and save_due(last_done, C.save_every):
+        save_latest(model, optimizer, scaler, last_done, shards)
+
+if is_main(rank) and last_done > start_step and not save_due(last_done, C.save_every):
+    save_latest(model, optimizer, scaler, last_done, shards)
+\end{verbatim}
+\vspace{1mm}\hrule
+\end{minipage}
+\caption*{\textbf{Algorithm \thealgorithm.} Code-level pseudocode corresponding to the current \texttt{training/trainer.py}
+worker. A sampled sequence gets one initial state; that state is carried across all
+\texttt{micro\_chunk} calls and detached only after each \texttt{bptt\_chunks}-segment backward
+window. Detachment truncates the gradient graph but preserves the forward state. The weighted loss
+includes language modelling, configured multi-token prediction, MoE auxiliary loss, and route
+entropy exactly as configured; the checkpoint stores the architecture, optimiser, scaler, data
+cursor, and RNG state needed for resumption. Evaluation and generation use the same carried-state
+forward interface without the optimiser section.}
+\label{alg:streaming}
 \end{figure*}
 
 \subsection{Training interface}

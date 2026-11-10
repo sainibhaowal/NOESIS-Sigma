@@ -22,31 +22,33 @@ python scripts/kaggle_push.py code --version   # refresh the code dataset
 python scripts/kaggle_push.py data --watch     # CPU kernel: tokenise TinyStories
 ```
 
-`build_corpus.py` trains an 8K BPE tokenizer on TinyStories, then writes 50M-token uint32 shards
-(EOS between documents) to `/kaggle/working/corpus` plus a 5M-token `val/` split.
+`build_corpus.py` trains an 8K byte-level BPE tokenizer on TinyStories, then targets 300M training
+tokens as six 50M-token uint32 shards plus a 5M-token validation split. EOS tokens separate
+documents; the realized validation count can be lower than the target because only complete encoded
+documents are written.
 
 Download the output and publish it as a dataset:
 
 ```bash
 python scripts/kaggle_push.py download ravsingh003/noesis-sigma-tinystories-data -p data/out
-# data/out/corpus/{metadata.json,shard-*.bin}, data/out/val/, data/out/tokenizer.json
-mkdir -p data/tinystories_dataset && cp -r data/out/corpus data/out/val data/tinystories_dataset/
+# data/out/corpus/{build.json,metadata.json,shard-*.bin,tokenizer.json,val/}
+mkdir -p data/tinystories_dataset && cp -r data/out/corpus data/tinystories_dataset/
 python scripts/kaggle_push.py dataset data/tinystories_dataset
 ```
 
-Kaggle extracts `corpus/` at the dataset root, so the training kernel mounts the shards at
-`/kaggle/input/noesis-sigma-tinystories/` (`metadata.json`, `shard-*.bin`, `val/`).
+Kaggle extracts `corpus/` at the dataset root, so the training kernel reads the shards from
+`/kaggle/input/noesis-sigma-tinystories/corpus/` (`metadata.json`, `shard-*.bin`, `val/`).
 
 ## 2. Train the 20M model (2 × T4)
 
 ```bash
-python scripts/kaggle_push.py code --version   # always refresh code before a run
+python scripts/kaggle_push.py code --version   # refresh code before a run
 python scripts/kaggle_push.py train --watch
 ```
 
-Settings live in `kaggle/train/train_config.json` (batch 8 per GPU, seq 1024, `micro_chunk` 256,
-`bptt_chunks` 4, 20k steps, `max_hours` 2.6). The trainer stops at the wall-clock budget and writes
-a final checkpoint, so a killed session loses at most one step.
+Settings live in `kaggle/train/train_config.json` (batch 16 per GPU, seq 1024, `micro_chunk` 256,
+`bptt_chunks` 4, 20k steps, `max_hours` 2.6). When the trainer reaches its own wall-clock budget it
+writes a final checkpoint; an external hard kill can still lose work since the last atomic save.
 
 Set `SMOKE = True` in `kaggle/train/run.py` for a three-step DDP validation run.
 

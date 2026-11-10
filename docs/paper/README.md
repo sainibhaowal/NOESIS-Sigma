@@ -7,19 +7,22 @@ Attention*.
 
 ## Build
 
+From the repository root, a standard TeX Live installation can build the report with:
+
 ```bash
 cd docs/paper
-tectonic -X compile main.tex
-```
-
-`tectonic` fetches the required TeX packages on first use and runs the bibliography passes
-automatically. A standard TeX Live installation also works:
-
-```bash
 pdflatex main.tex
 bibtex main
 pdflatex main.tex
 pdflatex main.tex
+```
+
+Tectonic is an optional alternative when installed; it resolves packages according to its own
+configuration and may need network access on the first build:
+
+```bash
+cd docs/paper
+tectonic -X compile main.tex
 ```
 
 ## Layout
@@ -32,6 +35,6 @@ pdflatex main.tex
 ## Evidence policy
 
 Every number in the report is traceable to a script or artifact in the repository:
-`scripts/gate.py`, `pytest tests`, `scripts/ladder.py`, `scripts/gapd_proof.py`, and the 21M
-training/evaluation scripts. Raw outputs live in `results/`. Unmeasured claims are marked as
+`scripts/gate.py`, `pytest tests`, `scripts/ladder.py`, `scripts/gapd_proof.py`, and the
+training/evaluation scripts used for the recorded 21M run. Raw outputs live in `results/`. Unmeasured claims are marked as
 such in the claims map (`tab:claims`) and the honesty ledger (`app:ledger`).
