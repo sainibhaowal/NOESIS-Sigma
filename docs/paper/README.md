@@ -1,7 +1,8 @@
 # SigmaStorm technical report
 
 LaTeX source for *SigmaStorm: Bounded-State Sequence Modeling without Dense Token-to-Token
-Attention*.
+Attention*, the executable model in the **NOESIS-Σ** (**N**eural **O**perator **E**nergy-guided
+**S**tateful **I**nference **S**ystem) research project.
 
 **Author:** Ravinder Singh
 

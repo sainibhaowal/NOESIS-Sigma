@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use NOESIS-Σ, please cite the preferred technical report or this repository."
+message: "If you use NOESIS-Σ (Neural Operator Energy-guided Stateful Inference System), please cite the preferred technical report or this repository."
 title: "NOESIS-Σ: Bounded-State Sequence Modeling without Dense Token-to-Token Attention"
 type: software
 version: "0.12.0"

@@ -7,6 +7,14 @@
 > **Naming:** NOESIS-Σ is the research project. **SigmaStorm** is the executable model and Python
 > package implemented in this repository.
 
+**Name meaning and pronunciation.** *Noesis* (pronounced **noh-EE-sis**) is a Greek term for
+understanding or the act of knowing. For this repository, the name is also used as an adopted
+descriptive expansion: **N**eural **O**perator **E**nergy-guided **S**tateful **I**nference
+**S**ystem. This letter-by-letter expansion is a project convention, not the historical meaning of
+the Greek word. `Σ` is read **sigma** and denotes aggregation of operator proposals and state
+updates. **NOESIS-Σ** is therefore pronounced “noh-EE-sis SIG-ma”; **SigmaStorm** is pronounced
+“SIG-ma-storm.”
+
 **Author:** Ravinder Singh
 
 <div align="center">
