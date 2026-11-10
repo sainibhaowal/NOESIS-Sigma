@@ -1,28 +1,22 @@
-"""Chunk-summary attention — the global, exact-distance path (Gap C).
+"""Chunk-summary attention — a bounded summary path (Gap C).
 
-Every other operator is either local (convolution, sliding window) or an exponentially decaying
-recurrence (delta rule, slot memory). None of them can address a token that is exactly 40K positions
-back with the same precision as one 40 positions back: the delta rule has forgotten, and the slot
-memory is a prototype store, not an index. A transformer solves this with a full ``[T, T]`` score
-matrix, which costs quadratic memory and compute.
-
-This operator keeps one key/value vector per pooled chunk instead: a fixed ring of
-``summary_slots`` summaries, each produced by averaging a completed block of ``summary_chunk``
-tokens and projecting it. Every token queries the whole ring::
+This operator keeps one key/value vector per pooled chunk: a fixed ring of
+summary_slots summaries, each produced by averaging a completed block of summary_chunk tokens
+and projecting it. Every token queries the retained ring:
 
     q_t  = normalize(W_q x_t)
     s_tj = q_t . k_j / sqrt(d) - softplus(age) * (index - pos_j)
     o_t  = W_o sum_j softmax_j(s_tj) v_j
 
-Cost is ``O(T * summary_slots * width)`` — linear in context with a tiny constant (a few dozen
-slots) — and state is constant. The age bias is learned per head, so a summary can persist for the
-whole sequence or fade, and the ring bounds memory while keeping the most recent
-``summary_slots`` chunks addressable by exact position.
+Cost is O(T * summary_slots * width) for fixed configuration — linear over the processed tokens
+with a bounded ring — and state is constant in context length. The age bias is learned per head,
+so a retained summary can persist or fade. The ring bounds memory; it is not an unbounded token
+index.
 
-Exactness: a summary is written only when a full block of ``summary_chunk`` tokens has been seen, and
-the partial block and ring cursor are carried in :class:`SummaryState`. A sequence processed in one
-call or in arbitrary chunks therefore produces the same output. The read of a token always uses
-summaries of *earlier* completed blocks, never its own.
+The implementation writes a summary only after a full block of summary_chunk tokens and carries
+the partial block and ring cursor in SummaryState. This is the state-carrying condition tested by
+the paper's split-equivalence gate; that gate is not a claim over every possible boundary, length,
+or backend. A token reads summaries from earlier completed blocks, never its own.
 """
 
 from __future__ import annotations

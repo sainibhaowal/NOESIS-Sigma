@@ -34,8 +34,10 @@ Freezing embeddings and untying the head removes that shortcut.
       answer is supervised. Chance is $0.50$. The model is conv + slot memory only; token
       embeddings are frozen and the output head is untied.
 \item \textbf{Language modeling.} TinyStories tokenised with an 8K byte-level BPE tokenizer,
-      EOS between documents, 300M training tokens and 5M held-out tokens. Held-out loss is
-      measured on the held-out split; perplexity is $\exp(\text{CE})$ within this tokenizer.
+      EOS between documents, a 300M training-token target and a 5M held-out-token target. The
+      checked-in validation artifact contains 4{,}713{,}394 tokens, so the realized validation
+      size is smaller than the build target. Held-out loss is measured on that split; perplexity
+      is $\exp(\text{CE})$ within this tokenizer.
 \end{itemize}
 
 \paragraph{Protocol.}
@@ -84,7 +86,7 @@ Decay spectrum improves long-range recall & $\geq256$: $1.000$ vs.\ $0.297$ (fro
 State expansion increases capacity & expand1 $0.754$ vs.\ expand2 $0.555$ at 66 bindings & Not demonstrated \\
 Chunk summaries improve aggregate recall & $0.703$ with vs.\ $0.672$ without; an earlier $0.797$ vs.\ $0.891$ did not reproduce & Inconclusive \\
 Gated slot read is content-addressed & presence $0.977/1.000/0.953$ vs.\ chance; $\Delta_{\mathrm{abl}}=+2.26$ nats & Established (synthetic) \\
-Gated read does not regress other paths & MQAR $0.990/0.987$; LM $3.0826$ vs.\ $3.0760$ nats & Supported (small scale) \\
+Gated read leaves the checked controls close & MQAR is higher in both seeds; aggregate is mixed; one LM pair is $3.0826$ vs.\ $3.0760$ nats & Mixed; no improvement claim \\
 Small language model trains and generates & 21M params, 348M tokens, held-out loss $1.2523$ / PPL $3.498$ & Prototype demonstrated \\
 Competitive with transformers at LM & no matched LM baseline was trained & Not claimed \\
 256K-token context works & no model trained at that context & Not demonstrated \\

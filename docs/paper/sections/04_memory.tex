@@ -85,8 +85,9 @@ where $\delta$ is the novelty floor and $[\cdot]_+=\max(\cdot,0)$. Novelty is co
 first against the consolidated prototypes, then causally against writes earlier in the same
 block. The second pass suppresses a repeated filler on its second occurrence instead of
 flooding the accumulator. The floor is a dead-zone, not a damping heuristic: below $\delta$ the
-write weight is exactly zero, so a repeated token cannot leak into every slot, and above
-$\delta$ the gradient is unchanged.
+write weight is exactly zero, so a repeated token cannot leak into every slot. Above the floor,
+the novelty term is linearly rescaled by the fixed factor $1-\delta$ before multiplication by
+the evidence gate; the resulting gradient is not literally unchanged.
 
 \paragraph{Consolidation.}
 Writes accumulate for \texttt{slot\_block} tokens and are consolidated with a Bayesian weight
@@ -103,8 +104,9 @@ u_j&\leftarrow(1-\eta_j)u_j+\eta_j .
 \end{aligned}
 \end{equation}
 One confident token moves a slot slightly; a block of agreeing tokens replaces it. The
-accumulator, token counter, and ring are carried in the state, so the operator is exactly
-chunk-invariant for any boundary.
+accumulator, token counter, and ring are carried in the state, which is the mechanism's
+chunking contract. The current equivalence gate tests this behavior at a split inside a slot
+block; it does not measure every boundary, length, or backend.
 
 \paragraph{Read gate.}
 A softmax always hands out unit mass, so a query that matches nothing still receives a
@@ -126,8 +128,10 @@ that is sharp before addresses are trained picks an arbitrary slot. The confiden
 differentiable abstention path: unmatched queries contribute zero and the residual stream alone
 answers them. \Cref{fig:slot} shows the two paths. All three changes are opt-in
 (\texttt{memory\_novelty\_floor}, \texttt{memory\_read\_temperature},
-\texttt{memory\_abstain}); the defaults preserve the previous behaviour and existing
-checkpoints load unchanged.
+\texttt{memory\_abstain}); the defaults preserve the previous behaviour. Checkpoint
+compatibility is governed by the saved architecture configuration and should be verified for
+each artifact; this paper does not claim that arbitrary historical checkpoints accept every
+future configuration.
 
 \begin{figure*}[t]
 \centering
@@ -175,7 +179,7 @@ distribution by a learned match-confidence factor, so an unmatched query contrib
 \label{fig:slot}
 \end{figure*}
 
-\subsection{Chunk summaries: a global path without $T^2$ (Gap C)}
+\subsection{Chunk summaries: a bounded global path without $T^2$ (Gap C)}
 \label{sec:summary}
 
 Every \texttt{summary\_chunk} tokens, one pooled summary is written to a fixed ring of
@@ -183,16 +187,17 @@ Every \texttt{summary\_chunk} tokens, one pooled summary is written to a fixed r
 \begin{equation}
 \label{eq:summary}
 \begin{aligned}
-p_c&=\frac1C\sum_{t\in c}x_t,\\
-K_c&=\frac{\mathrm{normalize}(W_kp_c)}{\sqrt{d_h}},\qquad
-V_c=\frac{W_vp_c}{\sqrt{d_h}},\\
-\mathrm{score}_{tc}&=q_t\!\cdot\!K_c\\
+p_c&=\frac1C\sum_{t\in c}u_t,\qquad u_t=\rms(x_t),\\
+q_t&=\mathrm{normalize}(W_qu_t),\\
+K_c&=\mathrm{normalize}(W_kp_c),\qquad V_c=W_vp_c,\\
+\mathrm{score}_{tc}&=q_t\!\cdot\!K_c/\sqrt{d_h}\\
 &\qquad-\mathrm{softplus}(\gamma)\,(t_c^{\mathrm{idx}}-\mathrm{pos}_c),\\
 o_t&=W_o\sum_c\softmax_c(\mathrm{score}_{tc})\,V_c .
 \end{aligned}
 \end{equation}
-Cost is $O(TS\,d)$, state is constant, and the age bias is learned per head, so a summary can
-stay addressable for the whole sequence or fade. Only completed chunks are written; the
-partial-chunk accumulator is carried in the state, which makes the operator chunk-invariant.
-This is the only path that gives every token a global, non-decaying view without a $T^2$
-matrix. Its measured benefit is discussed honestly in \Cref{sec:results-gap-bc}.
+Cost is $O(TS\,d)$ for fixed summary count, width, and chunking, and state is constant in $T$.
+The age bias is learned per head, so a summary can stay addressable for the retained ring or
+fade. Only completed chunks are written; the partial-chunk accumulator is carried in the state.
+This is a bounded global-summary path, not exact token-level retrieval for an unbounded sequence,
+and it avoids constructing a $T\times T$ summary attention matrix. Its measured benefit is
+discussed honestly in \Cref{sec:results-gap-bc}.

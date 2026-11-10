@@ -24,11 +24,41 @@
 \usepackage{natbib}
 \usepackage{url}
 \usepackage{hyperref}
-\usepackage[nameinlink,noabbrev]{cleveref}
-\usepackage{balance}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
 \usepackage{placeins}
+
+% Keep typed, clickable cross-references without depending on cleveref's
+% pre-2026 refstepcounter patch, which is incompatible with some current
+% LaTeX releases.
+\makeatletter
+\newcommand{\Cref}[1]{\CrefDispatch#1\@nil}
+\newcommand{\cref}[1]{\CrefDispatch#1\@nil}
+\def\CrefDispatch#1:#2\@nil{%
+  \def\CrefType{#1}%
+  \def\CrefFig{fig}%
+  \def\CrefTab{tab}%
+  \def\CrefSec{sec}%
+  \def\CrefEq{eq}%
+  \def\CrefApp{app}%
+  \def\CrefObs{obs}%
+  \ifx\CrefType\CrefFig
+    \hyperref[#1:#2]{Figure~\ref*{#1:#2}}%
+  \else\ifx\CrefType\CrefTab
+    \hyperref[#1:#2]{Table~\ref*{#1:#2}}%
+  \else\ifx\CrefType\CrefSec
+    \hyperref[#1:#2]{Section~\ref*{#1:#2}}%
+  \else\ifx\CrefType\CrefEq
+    \hyperref[#1:#2]{Equation~\ref*{#1:#2}}%
+  \else\ifx\CrefType\CrefApp
+    \hyperref[#1:#2]{Appendix~\ref*{#1:#2}}%
+  \else\ifx\CrefType\CrefObs
+    \hyperref[#1:#2]{Observation~\ref*{#1:#2}}%
+  \else
+    \hyperref[#1:#2]{\ref*{#1:#2}}%
+  \fi\fi\fi\fi\fi\fi
+}
+\makeatother
 
 \definecolor{sigmaBlue}{HTML}{1B4F72}
 \definecolor{sigmaTeal}{HTML}{117A65}
@@ -64,8 +94,8 @@
 
 \title{\vspace{-1.1em}\textbf{SigmaStorm: Bounded-State Sequence Modeling without Dense Token-to-Token Attention}\\[0.4em]
 \large A technical report on mechanisms, falsification gates, and prototype-scale evidence}
-\author{NOESIS-$\Sigma$ Research\\[-0.1em]
-\small \texttt{github.com/sainibhaowal/NOESIS-SIGMA}}
+\author{Ravinder Singh\\[-0.1em]
+\small \url{https://github.com/sainibhaowal/NOESIS-Sigma}}
 \date{November 2026}
 
 \begin{document}
@@ -78,17 +108,20 @@ token is processed by heterogeneous operators---a short convolution, a gated del
 associative memory with a multiscale decay spectrum, per-token-gated slot memory, a ring
 of chunk summaries, and optional window attention---whose proposals are mixed by
 independent sigmoid gates, contracted by an energy gradient, and projected onto a norm
-ball. Every piece of state is fixed-size, so memory does not grow with context, and every
-operator is exactly chunk-invariant. Equivalence gates measure the delta rule against its
-sequential reference to $4.2\times10^{-7}$ and a chunked forward against the full forward
-to $1.6\times10^{-6}$, with the split placed inside a slot-consolidation and a summary
-block. On synthetic recall the model reaches $0.974$ on multi-query associative recall
-against $0.062$ chance; the decay spectrum removes the long-range collapse of a single-rate
-model ($1.000$ vs.\ $0.297$ at distances $\geq256$ tokens). We report a gated slot read
-that makes the slot memory content-addressed: presence recall rises from near chance
-($0.56/0.54/0.56$) to $\mathbf{0.977/1.000/0.953}$ across three seeds, with a $+2.26$-nat
-memory-ablation delta, without regressing recall or next-token loss. A 21M-parameter
-TinyStories model trained on 348M tokens reaches held-out loss $1.2523$ (PPL $3.498$).
+ball. Every piece of carried state has fixed configured capacity, so state-tensor memory does not
+grow with context. The implementation is tested for chunk equivalence at a split inside a
+slot-consolidation and a summary block; the reported maximum hidden-state difference is
+$1.6\times10^{-6}$ for that configuration. Equivalence gates measure the delta rule against its
+sequential reference to $4.2\times10^{-7}$. On synthetic recall the model reaches $0.974$ on
+multi-query associative recall against $0.062$ chance; the decay spectrum retains long-range
+recall in the tested frozen-rate task ($1.000$ vs.\ $0.297$ at distances $\geq256$ tokens).
+We report a gated slot read that makes the slot memory content-addressed on a frozen-embedding
+presence task: recall rises from near chance ($0.56/0.54/0.56$) to
+$\mathbf{0.977/1.000/0.953}$ across three seeds, with a $+2.26$-nat memory-ablation delta.
+The small paired language-model check changed validation CE from $3.0760$ to $3.0826$ nats;
+this is a single no-regression check, not evidence of an improvement. A 21M-parameter
+TinyStories model trained on 348M tokens produces the recorded held-out loss $1.2523$
+(PPL $3.498$) and locally coherent on-genre samples.
 We also report what is \emph{not} established: a capacity benefit from state expansion, a
 reliable benefit from chunk summaries, long-context training at 256K tokens, and any
 head-to-head language-modeling comparison with a transformer. This is a prototype evidence

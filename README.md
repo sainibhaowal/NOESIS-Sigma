@@ -7,6 +7,8 @@
 > **Naming:** NOESIS-Σ is the research project. **SigmaStorm** is the executable model and Python
 > package implemented in this repository.
 
+**Author:** Ravinder Singh
+
 <div align="center">
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-6cf5ff.svg)](LICENSE)
@@ -301,3 +303,15 @@ credit.
 
 Third-party dependencies, datasets, pretrained artifacts, and generated data may have separate
 terms. This repository does not relicense those materials under Apache-2.0.
+
+## Project policies
+
+- [Security policy](SECURITY.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Support guide](SUPPORT.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+- [Changelog](CHANGELOG.md)
+- [Attribution notice](NOTICE)
+- [Governance](GOVERNANCE.md)
+- [Authors and maintainers](AUTHORS.md)

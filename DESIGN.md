@@ -11,13 +11,14 @@ v  = Project_{‖·‖≤R}( u + dt(u) · [ Σ_i α_i(u) d_i − ∇E(u) + u ] )
 x  = x + out_proj(v)
 ```
 
-- `α_i(u)` are **independent sigmoid gates** (not a softmax). A softmax makes heterogeneous operators
-  compete for a fixed total; the cheapest one wins and the associative memory is starved. This was
-  observed directly (`route_conv 0.86, route_delta 0.07, route_memory 0.07` before the change).
+- `α_i(u)` are **independent sigmoid gates** (not a softmax). A softmax would force heterogeneous
+  operators to compete for a fixed total and could suppress the associative-memory path. The
+  independent gates let several operators contribute simultaneously; the repository does not claim
+  that one universal routing distribution applies to every checkpoint or input.
 - The mixture is **normalised by the gate sum**, so it is a convex combination: any subset of gates
   can be open at full strength, but the proposal cannot grow with the number of active operators.
-- Each operator output passes a **per-operator RMSNorm** before gating. Natural output scales differ
-  by two orders of magnitude; without this the largest operator dominates regardless of its gate.
+- Each operator output passes a **per-operator RMSNorm** before gating. This keeps the mixture on a
+  comparable scale; the repository does not treat a single output-scale ratio as a universal constant.
 - `dt(u) = dt · (0.5 + σ(·))`, `dt = 0.5` by default.
 - `Project` enforces the bounded-state contract on the latent `v` only, never on the residual stream.
 
@@ -26,13 +27,18 @@ while `(h_t, M_t, window)` carry information across tokens.
 
 ## 2. Why this is not a transformer
 
-- No `[T, T]` attention. The window operator is a sliding window on 1 block in 4, with a ring-buffer
-  state of `W` keys/values and `O(T·W)` cost. Remove it with `local_attn_every = 0`.
-- The global path is a **ring of chunk summaries** (`O(T · summary_slots)`), not pairwise attention.
-- The recurrence is the delta rule with `heads × state_expand` independent `d_head × d_head` states —
-  linear in `T`.
-- State memory is constant: 184,192 bytes per sample for the tiny preset (`state_expand = 2`) at
-  T=512 and T=4096.
+- The window operator is a sliding window on 1 block in 4, with a ring-buffer state of `W` keys and
+  values. Its retained history is bounded by `W`; however, the current implementation materialises
+  an attention mask over the current chunk, so its per-call work can include a chunk-length term.
+  Therefore `O(T·W)` is the intended bounded-window architecture, not a guaranteed runtime bound for
+  arbitrarily large unchunked calls. Remove the operator with `local_attn_every = 0`.
+- The global path is a **ring of chunk summaries** with fixed configured capacity, not pairwise
+  attention. For fixed capacity and width its intended cost is `O(T · summary_slots · d_model)`.
+- The recurrence is the delta rule with `heads × state_expand` independent `d_head × d_head` states;
+  its sequence-length work is linear in `T` for fixed model dimensions.
+- State tensor capacity is independent of sequence length: the current tiny-preset gate reports
+  `200,704` bytes per sample at both T=512 and T=4096 under its 2-byte fp16/bf16-equivalent
+  accounting assumption. This is state-tensor storage, not total process memory.
 
 ## 3. The delta rule (the recall operator)
 
@@ -53,8 +59,9 @@ O      = exp(gc) ⊙ Q S0 + tril(exp(gc_i − gc_j) · b_j · (q_i · k_j)) @ r
 S_C    = exp(gc_last) · S0 + (exp(gc_last − gc_j) · b_j · K)ᵀ @ r
 ```
 
-Every ratio used is ≤ 1 on the causal region, so no overflow is reachable. A gate compares the
-chunkwise path to a token-by-token reference to 4e-7.
+Every ratio used is ≤ 1 on the causal region, so the causal decay ratios do not overflow. The current
+gate compares the chunkwise path to a token-by-token reference with maximum absolute error
+`4.17e-7` for the tested configuration.
 
 ### 3.1 Decay spectrum (Gap A)
 
@@ -70,11 +77,11 @@ rate_h = r_min (r_max / r_min)^(h / (H-1))
 bias_h = log(expm1(rate_h))
 ```
 
-The projection weight is zero at initialisation, so these are exactly the initial rates and every
-rate remains a learned, token-dependent function. `_custom_init` protects the bias from the generic
-initialiser (defect 4.2). The result is a multiscale memory at step zero: some heads hold a binding
-for the whole sequence, others track the last few dozen tokens. The effect is measured in
-`results/ladder.md` (`single_timescale` vs `full`).
+With `decay_learnable=True` (the default), the projection weight is zero at initialisation, so these
+are the initial rates and later rates remain token-dependent. `_custom_init` protects the bias from
+the generic initialiser (defect 4.2). The result is a multiscale memory at step zero: some heads hold
+a binding longer than others. The effect is measured in `results/ladder.md` (`delta_spectrum` vs
+`delta_single_rate`).
 
 ### 3.2 State expansion (Gap B)
 
@@ -101,12 +108,12 @@ novelty_t = 1 − max_j cos(k_t, K_j)          # first pass: consolidated protot
            1 − max_j cos(k_t, P_j(t))        # second pass: P_j(t) = writes to slot j before t
 ```
 
-The floor `δ` is a dead-zone, not a heuristic: a repeated token with novelty 0.02 still contributes
-0.02 · evidence to every routed slot, and a few hundred repetitions sum past one pseudo-observation,
-so `η = D/(D+1)` replaces the slot with the filler mean. Measured before the floor: block-1 slot
-keys collapsed to pairwise cosine 0.94 and every slot acquired usage, so an absent query always
-retrieved something. The floor makes the redundancy filter exact below `δ` and leaves the gradient
-above it unchanged.
+Before the floor was enabled, a repeated token with novelty 0.02 still contributed approximately
+`0.02 · evidence` to routed slots; repeated filler could therefore accumulate into a pseudo-
+observation. In the pre-floor diagnostic, block-1 slot keys reached pairwise cosine 0.94 and every
+slot acquired usage, so an absent query always retrieved something. With `δ > 0`, the redundancy
+filter is exactly zero below `δ`; above the floor, novelty is linearly re-scaled by `1 − δ` as shown
+in the formula.
 
 The second pass is causal: the first pass's gated writes are folded into a running per-slot
 prototype `P_j(t)` under `torch.no_grad()`, so a token inside the block is compared with the
@@ -126,11 +133,11 @@ use_j <- (1−η_j) use_j + η_j
 ```
 
 One confident token moves a slot slightly; a block of agreeing tokens replaces it. Reads happen
-against the slots as of the current consolidation block. The accumulator, the token counter and the
-ring state are carried in `SlotMemoryState`, so the operator is exactly chunk-invariant for **any**
-chunk boundary — the previous implementation wrote once per call on the chunk mean, which made the
-output depend on where the call was cut and let a chunk of 8K tokens read stale memory for its whole
-duration.
+against the slots as of the current consolidation block. The accumulator, token counter, and ring
+state are carried in `SlotMemoryState`, removing the previous dependency on writing once per call on
+the chunk mean. The current equivalence gate splits inside a slot block and confirms the carried-state
+path to its reported tolerance; this is evidence for the tested configuration, not a blanket claim
+for every backend or configuration.
 
 **The read is a gated address, not an average (Gap D).** The first version of this operator had a
 diffuse read: in the trained 20M checkpoint (step 10,604) per-block read entropy was 3.03–3.16 nats
@@ -152,45 +159,49 @@ read_t     = confidence · W_o Σ_j softmax_j(scores / τ_r) V_j
   alone answers them;
 - the **novelty floor** `δ` on the write path, which stops the slow leak that fills every slot.
 
-This is opt-in (`memory_novelty_floor`, `memory_read_temperature`, `memory_abstain`); the defaults
-keep the previous behaviour and every existing checkpoint loads unchanged.
+These controls are opt-in (`memory_novelty_floor`, `memory_read_temperature`, `memory_abstain`). The
+default configuration preserves the prior behavior, while checkpoint compatibility remains governed
+by the saved architecture configuration and must be verified for each checkpoint artifact.
 
 **Evidence (`scripts/gapd_proof.py`, frozen-embedding presence task, 16 slots, 8 of 16 symbols
 present, chance 0.50, 800 steps, three seeds).** Previous cosine read: 0.562 / 0.539 / 0.555.
 ZCA-whitened metric alone: 0.648 / 0.531 / 0.539 — it sharpens the read (entropy 1.26 → 0.72 nats)
 but does not make it useful, because whitening amplifies *every* deviation direction, including the
-context noise. Gated read: **0.977 / 1.000 / 0.953**, confidence 0.95 on present vs 0.08 on absent
-queries, read entropy 0.41 nats. MQAR (Gap A path) is unchanged to three decimals; the aggregate
+context noise. Gated read: **0.977 / 1.000 / 0.953**, confidence **0.562 on present** vs
+**0.026 on absent** queries, and read entropy 0.413 nats.
+MQAR (Gap A path) is unchanged to three decimals; the aggregate
 count task (Gap C path, unaffected by this operator) stays within its seed variance. The ZCA option
 is kept as a documented alternative for address spaces with a dominant shared direction, but it is
 not the mechanism that makes the memory content-addressed.
 
-### 3.4 Chunk summaries: the global exact-distance path (Gap C)
+### 3.4 Chunk summaries: the fixed-ring global path (Gap C)
 
 Every `summary_chunk` tokens one pooled summary is written to a fixed ring of `summary_slots`:
 
 ```
-p_c  = (1/C) Σ_{t in chunk c} x_t
+p_c  = (1/C) Σ_{t in chunk c} u_t
 K_c  = normalize(W_k p_c) / per head        V_c = W_v p_c / per head
 score_tc = q_t · K_c / sqrt(d_head) − softplus(age) · (index − pos_c)
 o_t  = W_o Σ_c softmax_c(score_tc) V_c
 ```
 
-Cost is `O(T · summary_slots · d_model)`, state is constant, and the age bias is learned per head, so
-a summary can stay addressable for the whole sequence or fade. Only completed chunks are written and
-the partial accumulator is carried in `SummaryState`, so this operator is chunk-invariant too. This
-is what gives the model a global path that does not decay exponentially and does not cost `T²`.
+Cost is `O(T · summary_slots · d_model)` for fixed configured capacity and width; state is constant,
+and the age bias is learned per head, so a retained summary can stay addressable or fade. The ring
+retains only `summary_slots` completed summaries, not every past token. Only completed chunks are
+written and the partial accumulator is carried in `SummaryState`, so the tested implementation has a
+bounded global path without a full `T²` attention matrix. Here `u_t = RMSNorm(x_t)` is the normalized
+latent used by the block.
 
-## 4. The three learning facts
+## 4. The five learning facts
 
-The first version of this package sat at MQAR chance (6.2%). Four defects, each verified by an
-ablation, were:
+The first version of this package sat at MQAR chance (6.2%). The documented implementation lessons
+were:
 
 **4.1 Key must be the previous token.** A binding is written when the value arrives (token `t`); the
 key is the token before it (`t−1`). Reading q, k, v all from position `t` forces the projections to
 separate two blended tokens, and they do not. The key is shifted by one, and the previous chunk's
-last input is carried in `BlockState.prev` so chunk boundaries behave exactly like the unchunked
-stream (verified to 8e-7).
+last input is carried in `BlockState.prev`, so the current gate preserves chunk equivalence for its
+tested configuration (maximum hidden-state difference `1.55e-6`).
 
 **4.2 The generic initialiser zeroed the decay bias.** `model.apply(_init_weights)` ran after the
 modules set their own initialisation and reset `decay_proj.bias` to 0, making α = 0.5 per token:
@@ -200,9 +211,10 @@ bindings vanished in two tokens. `_init_weights` now skips modules marked `_cust
 block erased the token identity the associative operator needs. The law now runs on a latent `v` and
 the block adds `out_proj(v)` to the residual stream.
 
-**4.4 Mixing scale.** A raw sum of operator outputs let an amplified retrieval (norm ~18) saturate
-the projection at R = 16; gradients through the clamp stopped carrying signal. Convex mixture +
-per-operator RMSNorm fixed it across every configuration tested (all ≥ 0.92 MQAR after 250 steps).
+**4.4 Mixing scale.** A raw sum of operator outputs can amplify retrieval and saturate the bounded
+projection, reducing useful gradient through the clamp. Convex mixture plus per-operator RMSNorm
+keeps the proposal scale controlled in the current design; the repository does not claim a universal
+MQAR threshold across all configurations.
 
 **4.5 The MQAR task itself had a ceiling.** Keys were sampled with replacement, so a queried key often
 had several bindings and the best possible score was ≈ 0.6. Keys are now unique per sequence; the
@@ -216,35 +228,39 @@ ceiling is 1.0.
 | :--- | :--- | :--- |
 | `conv_tail` | `[B, k−1, d]` | yes |
 | `ssm` | `[B, H·k, d_head, d_head]` | yes |
-| `memory` | slots × d (keys, values) + usage + write accumulators | yes |
+| `memory` | `[B, slots, d]` keys/values + usage and write accumulators | yes |
 | `summary` | `[B, H, S, d_head]` ×2 + usage/pos + partial-chunk accumulator | yes |
 | `window` | `[B, H, W, d_head]` ×2 | yes |
 | `win_len` | scalar | yes |
 | `prev` | `[B, d]` | yes |
 
-Nothing in the state depends on `T`. Every operator is now exactly chunk-invariant, including the
-slot memory and the summary ring (their write accumulators are carried). The equivalence gate splits
-a sequence at position 50 — inside a 64-token slot block and a 32-token summary block — and matches
-the full forward to 2e-6.
+For a fixed model configuration, none of these state tensor shapes depends on `T`. The slot memory
+and summary ring carry their write accumulators across calls. In the current equivalence gate, a
+sequence is split at position 50 — inside a 64-token slot block and a 32-token summary block — and
+the chunked hidden states match the full forward with maximum difference `1.55e-6`. This is a tested
+tolerance for that configuration, not a proof for every backend or chunk boundary.
 
 ## 6. Training
 
-- `micro_chunk` tokens per forward call (default 2048), state carried inside a sequence.
-- `bptt_chunks × micro_chunk` differentiable horizon (default 8K tokens); the state is detached at
-  the window boundary. Forward context is not limited by this; gradients are.
+- `micro_chunk` tokens per forward call (CLI default 512), state carried inside a sequence. The
+  tracked Kaggle training profile uses 256.
+- `bptt_chunks × micro_chunk` differentiable horizon (CLI default `4 × 512 = 2048` tokens); the
+  state is detached at the window boundary. Forward context is not limited by this; gradients are.
 - DDP with `no_sync()` on all but the final backward; fp16 scaler protocol is
   `unscale → clip → step → update`.
 - **WSD schedule** (warmup → stable → decay over the last `decay_frac` of the run). Cosine is still
   available, but WSD keeps the learning rate high through the middle of training instead of
   annealing early at the same token budget.
-- **MTP warmup**: the multi-token loss is ramped from 0 over `mtp_warmup_steps`, so the auxiliary
-  objective does not compete with the LM loss before the backbone has features.
-- **Sequence-length ramp**: `seq_len_start → seq_len` over `seq_ramp_steps`. Short, dense windows
-  first; long-context structure later.
-- **TF32** for matmuls on Ampere+ (no measurable quality cost, ~2× speed), optional
-  `torch.compile`.
-- Checkpoints are atomic and resumable: model, optimizer, scaler, data cursor, step, RNG, and the
-  architecture config (a mismatched config refuses to load rather than silently reshaping).
+- **MTP warmup**, when configured: the multi-token loss is ramped from 0 over `mtp_warmup_steps`,
+  so the auxiliary objective does not compete with the LM loss before the backbone has features.
+- **Sequence-length ramp**, when configured: `seq_len_start → seq_len` over `seq_ramp_steps`. Short,
+  dense windows first; long-context structure later.
+- **TF32** is enabled for CUDA matmuls where supported; speed and quality effects depend on hardware
+  and run settings and are not separately benchmarked here. `torch.compile` is optional and currently
+  restricted to single-process training.
+- Checkpoints are atomic and resumable: model, optimizer, scaler, data cursor, step, CPU RNG state,
+  and architecture config (a mismatched config refuses to load rather than silently reshaping). CUDA
+  RNG streams are not explicitly serialized by the current checkpoint payload.
 - Chunked cross-entropy: logits are sliced over flat tokens, never `[B, T, vocab]`.
 
 ## 7. What is deliberately absent
@@ -253,5 +269,6 @@ the full forward to 2e-6.
   is a contraction, not an attractor network.
 - A compute-skipping controller. Gates are mixture weights; a zero gate does not skip a kernel in
   dense PyTorch. Token-sparse gather is future work.
-- Cross-chunk backpropagation through the whole context. That requires context parallelism and is
-  not feasible on 16 GB GPUs.
+- Cross-chunk backpropagation through the whole context. The default trainer truncates gradients at
+  the configured BPTT horizon; extending that horizon increases activation memory and may exceed a
+  given GPU budget.

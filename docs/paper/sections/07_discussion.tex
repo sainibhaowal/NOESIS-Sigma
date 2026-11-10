@@ -9,6 +9,43 @@ multiscale decay initialisation is not cosmetic: with the bias frozen, a single 
 long-range recall while the spectrum retains it. Third, a memory read needs an abstention path;
 a sharper softmax alone does not make a store content-addressed.
 
+\paragraph{Hypotheses and evidence levels.}
+The following map separates mechanisms that are implemented from hypotheses that have actually
+survived a controlled test.
+\begin{table*}[t]
+\centering
+\caption{Hypotheses, evidence, and current status.}
+\label{tab:hypotheses}
+\small
+\begin{tabularx}{\textwidth}{@{}
+>{\raggedright\arraybackslash}p{0.26\textwidth}
+>{\raggedright\arraybackslash}p{0.48\textwidth}
+>{\raggedright\arraybackslash}p{0.22\textwidth}@{}}
+\toprule
+Hypothesis & Evidence in this report & Status \\
+\midrule
+Carried state and caller-independent forward behavior &
+One split inside a slot and summary block; max hidden difference $1.6\times10^{-6}$ &
+Demonstrated for the tested configuration \\
+Multiple decay rates and delayed recall &
+Recall at distances $\geq256$: $1.000$ vs.\ $0.297$ &
+Supported on the frozen synthetic task \\
+An abstaining slot read is more useful than a sharper always-on read &
+Gated presence recall $0.977/1.000/0.953$; whitening remains near chance &
+Supported on the frozen-embedding task \\
+More delta states increase usable capacity &
+Expand 1: $0.754$; expand 2: $0.555$ at 66 bindings &
+Not supported by the reported run \\
+Chunk summaries improve aggregate quality &
+$0.703$ vs.\ $0.672$ in one run; earlier run had the opposite sign &
+Inconclusive \\
+The design supports 256K-token modeling &
+256K is a design target; no training or evaluation at that length &
+Not tested \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
 \paragraph{Sharpness is not addressing.}
 The Gap D result is the clearest lesson of the study. ZCA whitening reduced read entropy from
 $1.26$ to $0.72$ nats and still left presence recall at chance. Entropy measures concentration,
@@ -39,13 +76,15 @@ experiment, and it is cheap relative to the scale debate: a 21M transformer on 3
 tokens fits the same two-T4 budget.
 
 \paragraph{The long-context claim is architectural, not empirical.}
-The state contract is real: 200{,}704 bytes at $T=512$ and $T=4096$ for the tiny preset, and
-every operator is chunk-invariant. That is a prerequisite for streaming a 256K-token sequence
-in bounded memory, but it is not the same as training or evaluating at 256K. The 21M run used
-1{,}024-token windows with a differentiable horizon of $4\times256$ tokens in the reported
-configuration. Long-context ability---retrieval over tens of thousands of tokens, stability of
-the energy-controlled latent, and the interaction of the summary ring with the delta state---has
-not been measured. The design target is 256K; the evidence stops far short of it.
+The state contract is real: 200{,}704 bytes at $T=512$ and $T=4096$ for the tiny preset. The
+reported split test supports the carried-state implementation for one configuration, but does
+not prove every operator and boundary on every backend. Constant configured state is a
+prerequisite for streaming a 256K-token sequence in bounded state memory, not evidence that the
+model can usefully model 256K tokens. The 21M run used 1{,}024-token windows with a
+differentiable horizon of $4\times256$ tokens in the reported configuration. Long-context
+ability---retrieval over tens of thousands of tokens, stability of the energy-controlled latent,
+and the interaction of the summary ring with the delta state---has not been measured. The design
+target is 256K; the evidence stops far short of it.
 
 \paragraph{Engineering cost.}
 At equal width SigmaStorm is slower than the transformer control on CPU and has more

@@ -5,7 +5,7 @@
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-  font=\small, >=Latex, node distance=5mm and 6mm,
+  font=\small, >=Latex, node distance=4mm and 6mm,
   box/.style={draw=sigmaBlue!80, rounded corners=2pt, fill=lightBlue, align=center,
               minimum height=8mm, minimum width=19mm},
   op/.style={draw=sigmaTeal!80, rounded corners=2pt, fill=lightTeal, align=center,
@@ -15,52 +15,48 @@
   state/.style={draw=black!45, dashed, rounded corners=2pt, fill=white, align=center,
                 minimum height=9mm, minimum width=32mm, font=\footnotesize},
   arrow/.style={->, thick, draw=black!70},
-  darrow/.style={->, dashed, thick, draw=sigmaTeal!80},
-  carrow/.style={->, thick, draw=sigmaOrange!90}
+  darrow/.style={->, thick, draw=sigmaTeal!80},
+  carrow/.style={->, thick, draw=sigmaOrange!90},
+  statearrow/.style={<->, dashed, draw=black!55}
 ]
-\node[box] (tok) {token $x_t$};
-\node[box, right=of tok] (res) {residual\\stream $x$};
-\node[box, right=of res, fill=lightOrange] (norm) {$\rms$};
-\node[op, above right=6mm and 8mm of norm] (conv) {ShortConv};
+\node[box] (tok) {token ids};
+\node[box, right=of tok] (embed) {embedding\\+ residual $x$};
+\node[box, right=of embed, fill=lightOrange] (norm) {$u=\rms(x)$};
+\node[op, above right=10mm and 12mm of norm] (conv) {ShortConv};
 \node[op, right=of conv] (delta) {delta rule};
-\node[op, below=4mm of delta] (slot) {slot memory};
-\node[op, left=of slot] (summ) {summaries};
-\node[op, below=4mm of summ] (win) {window (1/4)};
-\node[ctrl, right=16mm of delta, yshift=-9mm] (mix) {independent gates\\convex mixture\\$-\nabla E(u)$, $\Delta t(u)$};
-\node[box, right=of mix] (proj) {$\Proj$};
-\node[box, right=of proj] (out) {$W_o$};
-\node[box, right=of out] (add) {$\oplus$};
-\node[box, right=of add] (next) {$x'$};
+\node[op, below=3mm of delta] (slot) {slot memory};
+\node[op, below=3mm of slot] (summ) {summary ring};
+\node[op, below=3mm of summ] (win) {window (1/4)};
+\node[ctrl, right=18mm of slot] (ctrl) {controller\\independent sigmoid gates\\$\Delta t(u)$};
+\node[ctrl, right=of ctrl] (mix) {gate-normalised mixture\\$m-\mathrm{grad}\,E(u)+u$};
+\node[box, right=of mix] (proj) {$v=\Proj(\cdot)$};
+\node[box, right=of proj] (out) {$W_o v$};
+\node[box, right=of out] (add) {$x'=x+W_o v$};
+\node[state, below=13mm of summ] (state) {carried state: conv tail, delta matrices, slot prototypes and accumulators,\\
+summary ring and partial chunk, window ring, previous normalised token};
 
-\draw[arrow] (tok) -- (res);
-\draw[arrow] (res) -- (norm);
-\draw[darrow] (norm.east) -| (conv.west);
-\draw[darrow] (norm.east) -| (win.west);
-\draw[darrow] (norm) -- (summ);
-\draw[darrow] (summ) -- (slot);
-\draw[darrow] (delta) -- (mix);
-\draw[darrow] (slot.east) -| (mix.south);
-\draw[darrow] (conv.east) -| (mix.north);
+\draw[arrow] (tok) -- (embed);
+\draw[arrow] (embed) -- (norm);
+\foreach \op in {conv,delta,slot,summ,win} {
+  \draw[darrow] (norm.east) -| (\op.west);
+  \draw[darrow] (\op.east) -| (mix.west);
+  \draw[statearrow] (state.north) -| (\op.south);
+}
+\draw[carrow] (norm.east) |- (ctrl.west);
+\draw[carrow] (ctrl) -- (mix);
 \draw[arrow] (mix) -- (proj);
 \draw[arrow] (proj) -- (out);
 \draw[arrow] (out) -- (add);
-\draw[arrow] (res) |- (add);
-\draw[arrow] (add) -- (next);
-
-\node[state, below=16mm of summ] (state) {carried state: conv tail, $Hk_{\mathrm{exp}}$ delta matrices, slot prototypes + accumulators,
-summary ring + partial chunk, window ring, previous token};
-\draw[darrow] (state.north) -- (summ.south);
-\draw[darrow] (state.east) -| ([xshift=6mm]mix.south);
+\draw[arrow] (embed.east) |- (add.south);
 
 \node[draw=sigmaOrange!60, dashed, rounded corners, fit=(conv)(delta)(slot)(summ)(win), inner sep=2.5mm,
-      label={[sigmaOrange, font=\footnotesize, yshift=2mm]above left:operator bank (independent gates)}] {};
+      label={[sigmaOrange, font=\footnotesize, yshift=2mm]above left:parallel operator bank}] {};
 \end{tikzpicture}}
-\caption{The SigmaStorm computation. A token enters the residual stream and a bounded latent is
-advanced by the law of \Cref{eq:block}. Operator proposals pass through per-operator RMSNorm
-and independent sigmoid gates; the convex mixture is contracted by $-\nabla E$ and projected
-onto the norm ball before the residual update. All cross-token information lives in the
-fixed-size state below. The diagram is a schematic of the implemented contract, not a literal
-tensor layout.}
+\caption{Implemented SigmaStorm dataflow. The normalised latent $u$ is sent to the enabled
+operators in parallel; each operator reads and updates only its own carried state. The controller
+produces independent gates and the step size, the gate-normalised mixture is combined with the
+energy gradient and latent residual, and the projected proposal is added to the residual stream.
+The diagram is a dataflow contract, not a literal tensor-layout drawing.}
 \label{fig:architecture}
 \end{figure*}
 
@@ -75,14 +71,15 @@ $L$ times to the token-local latent, while $S_t$ carries information across toke
 Three details are not cosmetic.
 \begin{itemize}[leftmargin=1.1em]
 \item \textbf{Independent sigmoid gates.} A softmax over operators forces them to compete for
-      a fixed total. The cheapest operator wins and the associative memory is starved. In an
-      early configuration the routing was $\mathrm{conv}=0.86$, $\mathrm{delta}=0.07$,
-      $\mathrm{memory}=0.07$. Independent sigmoids let any subset open at full strength.
-\item \textbf{Convex normalisation.} Dividing by $\sum_i\alpha_i(u)$ makes the mixture a convex
-      combination. Without it, a retrieval whose output norm is $\sim18$ saturates the
-      projection at $R=16$ and gradients through the clamp stop carrying signal.
-\item \textbf{Per-operator RMSNorm.} Natural output scales differ by two orders of magnitude.
-      Normalising each $d_i$ before gating ensures the gate, not the scale, decides influence.
+      a fixed total and can suppress an operator that is useful on a particular token. Independent
+      sigmoids let any subset contribute simultaneously; they are mixture weights, not a compute
+      skipping mechanism.
+\item \textbf{Convex normalisation.} Dividing by the gate sum keeps the proposal scale from
+      growing merely because more operators are enabled. The normalisation is a stability device,
+      not evidence that any particular routing distribution is optimal.
+\item \textbf{Per-operator RMSNorm.} Normalising each proposal before gating puts heterogeneous
+      operator outputs on a comparable scale, so the gate is not dominated by an arbitrary raw
+      output magnitude.
 \end{itemize}
 
 The step size is $\Delta t(u)=\Delta t\,(0.5+\sigma(a^\top u))$ with $\Delta t=0.5$ by default.
@@ -91,9 +88,11 @@ token identity available to the associative operator.
 
 \subsection{Operator family}
 
-\Cref{tab:operators} lists the operators, their role, asymptotic cost, and state size.
-``Window attention'' is enabled on one block in four by default and can be removed entirely;
-it is a sliding-window operator with a ring buffer, not a global attention mask.
+\Cref{tab:operators} lists the operators, their role, intended fixed-configuration cost, and
+state size. Window attention is enabled on one block in four by default and can be removed
+entirely; it retains a bounded ring history. The current implementation also materialises a mask
+over each input chunk, so the strict bounded-window runtime expression below should not be read as
+a guarantee for arbitrarily large unchunked calls.
 
 \begin{table*}[t]
 \centering
@@ -107,12 +106,12 @@ of summary slots, and $W$ the window length.}
 \toprule
 Operator & Role & Cost & State \\
 \midrule
-ShortConv & local order; the fast proposal & $O(Tk)$ & $k-1$ tokens \\
-Gated delta rule & associative recall (key$\to$value bindings) & $O(T)$ & $H k_{\mathrm{exp}}$ matrices $d_h\times d_h$ \\
-Slot memory & long-horizon prototypes with per-token gated writes & $O(T\cdot\text{slots})$ & slots$\times d$ + accumulators \\
-Chunk summaries & global exact-distance path without $T^2$ & $O(TS)$ & ring of $S$ summaries \\
-Window attention & precise local copying (1 block in 4, optional) & $O(TW)$ & ring buffer $W\times d$ \\
-Energy potential & contraction and stabiliser, $-\nabla E$ & $O(Td)$ & none \\
+ShortConv & local order; the fast proposal & $O(Tkd)$ & $k-1$ tokens \\
+Gated delta rule & associative recall (key$\to$value bindings) & linear in $T$ for fixed chunks and width & $H k_{\mathrm{exp}}$ matrices $d_h\times d_h$ \\
+Slot memory & long-horizon prototypes with per-token gated writes & $O(T n_s d)$ & $n_s\times d$ + accumulators \\
+Chunk summaries & bounded global summary path without $T^2$ & $O(TSd)$ & ring of $S$ summaries \\
+Window attention & precise local copying (1 block in 4, optional) & bounded-window intent; chunk-mask caveat above & ring buffer $W\times d$ \\
+Energy potential & contraction and stabiliser, $-\nabla E$ & $O(Td r)$ for rank $r$ & none \\
 Bounded projection & hard norm bound $\|v\|\leq R$ & $O(Td)$ & none \\
 Gated FFN / MoE & per-token compute & $O(Td\,d_{\mathrm{ff}})$ & none \\
 \bottomrule
@@ -145,28 +144,31 @@ this distinction was one of the three fixes that took MQAR from chance to $0.97$
 
 \subsection{State contract and chunk invariance}
 
-\begin{proposition}[Chunk invariance]
-\label{prop:chunk}
-Let a sequence be split into contiguous chunks at arbitrary boundaries. If the state
-$S_t$ of \Cref{tab:state} is carried between chunks, the hidden representation produced by
-processing the chunks is identical to the representation produced by one full forward pass.
-\end{proposition}
+\begin{observation}[Carried-state chunking contract]
+\label{obs:chunk}
+For a fixed configuration, carrying the state $S_t$ of \Cref{tab:state} between contiguous
+chunks is intended to make the hidden representation independent of the caller's chunk
+boundaries. The current gate tests one split at position 50, inside both a 64-token slot block
+and a 32-token summary block; it reports a maximum hidden-state difference of
+$1.6\times10^{-6}$. This is an implementation check for that configuration, not an empirical
+claim over every possible boundary, length, or hardware backend.
+\end{observation}
 
-\begin{proof}[Proof sketch]
-Every operator in \Cref{tab:operators} is a causal scan whose value at position $t$ depends
-only on its carried state and tokens up to $t$. The short convolution carries its $k-1$ token
-tail; the delta rule carries its matrices and, in chunkwise form, its end-of-chunk state; the
-slot memory carries the ring of prototypes \emph{and} the unconsolidated write accumulators,
-so a consolidation boundary is invisible; the summary ring carries completed summaries and the
-partial-chunk accumulator; the window carries its ring buffer and length. The controller and
-energy are token-local. Therefore the composition is invariant to where the caller cuts the
-stream, and gradient detaching affects gradients only, not the forward value.
-\end{proof}
+\paragraph{Why the contract is plausible.}
+Every operator in \Cref{tab:operators} is implemented as a causal scan whose value at position
+$t$ depends on its carried state and tokens up to $t$. The short convolution carries its $k-1$
+token tail; the delta rule carries its matrices and end-of-chunk state; the slot memory carries
+the ring of prototypes \emph{and} unconsolidated write accumulators; the summary ring carries
+completed summaries and its partial-chunk accumulator; and the window carries its ring buffer
+and length. The controller and energy are token-local. These are the design conditions needed
+for boundary independence. Gradient detaching changes the backward graph, not the forward
+state update.
 
 \begin{table}[t]
 \centering
-\caption{Carried state per block. No field depends on $T$. The slot and summary accumulators
-are what make those operators exactly chunk-invariant.}
+\caption{Carried state per block. No field has a dimension that grows with the processed length
+$T$ for a fixed configuration. The slot and summary accumulators preserve partial work across
+caller chunks; the reported equivalence result is limited to the tested configuration.}
 \label{tab:state}
 \small
 \begin{tabular}{@{}l l@{}}
@@ -179,27 +181,60 @@ Field & Shape / content \\
 \texttt{summary} & $[B,H,S,d_h]^{\times 2}$ + usage/pos + partial chunk \\
 \texttt{window} & $[B,H,W,d_h]^{\times 2}$ \\
 \texttt{win\_len} & scalar \\
-\texttt{prev} & $[B,d]$ (previous input token) \\
+\texttt{prev} & $[B,d]$ (previous normalised token) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\subsection{Streaming forward and update lifecycle}
+\label{sec:algorithm}
+
+\begin{figure*}[t]
+\centering
+\fbox{\begin{minipage}{0.94\textwidth}
+\textbf{Algorithm 1: carried-state training step.}
+\begin{enumerate}[leftmargin=1.6em]
+\item Initialise the block states once at the beginning of a sequence. Do not reset them at a
+      caller-defined micro-chunk boundary.
+\item For each micro-chunk, run every block from the incoming state. Within a block, compute
+      $u=\rms(x)$, evaluate the enabled operators from $u$ and their carried states, form the
+      gate-normalised mixture, apply the energy step and bounded projection, then add the
+      projected proposal to the residual stream. Return the updated state with the chunk output.
+\item Accumulate language-model and configured multi-token-prediction losses from flat token
+      slices. Repeat for \texttt{bptt\_chunks} micro-chunks while carrying the forward state.
+\item Detach the carried state at the truncated-backpropagation boundary, backpropagate the
+      accumulated loss, unscale and clip gradients when using mixed precision, then perform the
+      optimiser update and clear the accumulation window.
+\item Save checkpoints at the configured cadence, including the architecture configuration and
+      optimiser state needed to resume. Evaluation and generation carry state across chunks but
+      do not perform optimiser updates.
+\end{enumerate}
+\end{minipage}}
+\caption{The implemented streaming lifecycle. State detachment limits gradient history; it does
+not reset the forward memory. The algorithm describes the current training/evaluation interface,
+not an instruction-tuning or preference-optimisation pipeline.}
+\label{fig:stream-algorithm}
+\end{figure*}
+
 \subsection{Training interface}
 
-Training processes \texttt{micro\_chunk} tokens per forward call (default 2048) and carries
-the state within a sequence. The differentiable horizon is
-$\texttt{bptt\_chunks}\times\texttt{micro\_chunk}$ (default $4\times2048$ tokens); the state is
-detached at the window boundary. Forward context is not limited by this horizon, gradients
+Training processes \texttt{micro\_chunk} tokens per forward call (default 512 in the current
+training interface) and carries the state within a sequence. The differentiable horizon is
+$\texttt{bptt\_chunks}\times\texttt{micro\_chunk}$ (default $4\times512=2048$ tokens); the
+state is detached at the window boundary. One reported Kaggle training profile used
+256-token micro-chunks, so the paper reports the configured value rather than treating one
+profile as a universal default. Forward context is not limited by this horizon, but gradients
 are. Distributed execution uses DDP with \texttt{no\_sync} on all but the final backward and
 an fp16/bf16 scaler protocol of unscale--clip--step--update. The schedule is warmup--stable--decay;
 multi-token-prediction heads are ramped from zero; the sequence length can be ramped from short
 windows to long ones. Cross-entropy is computed over flat token slices, never as a
-$[B,T,\text{vocab}]$ tensor. Full hyperparameters are in \Cref{app:configs}.
+$[B,T,\text{vocab}]$ tensor. Full hyperparameters are in \Cref{app:configs}; the defaults are
+interface defaults, not a claim that every reported run used them.
 
 \subsection{Implementation invariants}
 
-Four defects were found by ablation while bringing the stack from chance-level to working
-recall. They are documented because each one silently returns the model to chance:
+Five implementation invariants were found while bringing the stack from chance-level to working
+recall. They are documented because violating any one can silently damage the result:
 \begin{enumerate}[leftmargin=1.2em]
 \item \textbf{The delta-rule key is the previous token.} A binding is written when the value
       arrives at $t$; its key is the token at $t-1$. Reading query, key, and value all from
@@ -210,6 +245,9 @@ recall. They are documented because each one silently returns the model to chanc
       steps.
 \item \textbf{The transition is an additive residual with a convex mixture.} Replacing the
       residual stream with the raw latent saturates the bound and erases token identity.
+\item \textbf{Operator scale is controlled before mixing.} Per-operator RMSNorm and
+      gate-sum normalisation keep the mixture from being dominated by raw output scale or by
+      the number of open gates; this is a stability condition, not a measured quality gain.
 \item \textbf{MQAR keys must be unique per sequence.} Sampling with replacement creates
       ambiguous queries and caps the achievable score near $0.6$.
 \end{enumerate}

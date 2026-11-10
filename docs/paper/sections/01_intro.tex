@@ -1,9 +1,10 @@
 \section{Introduction}
 
 Transformers owe much of their success to exact token-to-token attention, and much of their
-cost to it as well: the attention matrix and the key--value cache grow linearly in sequence
-length, so long-context inference pays memory proportional to the number of tokens already
-seen \citep{vaswani2017attention,dao2022flashattention}. Recent frontier systems attack this
+cost to it as well: the pairwise attention matrix is quadratic in sequence length, while the
+autoregressive key--value cache grows linearly with the prefix. Long-context inference therefore
+faces both a quadratic interaction cost and a growing cache
+\citep{vaswani2017attention,dao2022flashattention}. Recent frontier systems attack this
 cost with compressed or sparse attention and with aggressive KV-cache compression
 \citep{kimi2026,deepseek2026}. A complementary question is architectural: can a model replace
 the pairwise interaction matrix with a \emph{fixed-size} recurrent state that nevertheless
@@ -30,10 +31,11 @@ information across positions.
 
 The operators are chosen to cover different failure modes of sequence modeling:
 a short convolution for local order, a gated delta rule for key$\to$value associations, a
-slot memory for long-horizon prototypes, a ring of pooled chunk summaries for a global path
-that neither decays exponentially nor costs $T^2$, optional window attention for precise
-local copying, and an energy term that stabilises the latent trajectory. \Cref{tab:operators}
-lists their cost and state. Every state tensor has a shape independent of $T$.
+slot memory for long-horizon prototypes, a fixed ring of pooled chunk summaries for a bounded
+global path, optional window attention for precise local copying, and an energy term that
+stabilises the latent trajectory. \Cref{tab:operators} lists their cost and state. Every carried
+state tensor has a shape independent of $T$ for a fixed configuration; this is a state-capacity
+property, not evidence that the model has learned 256K-token behavior.
 
 \paragraph{Scope and evidence policy.}
 This report is deliberately a prototype record. It separates three things that are often
@@ -48,13 +50,14 @@ prominence as the positive ones.
 \begin{enumerate}[leftmargin=1.2em]
 \item \textbf{An executable transition law with a hard state contract.}
       \Cref{sec:method} gives the operator mixture, energy contraction, bounded projection,
-      and the exact chunk-carrying rules. The same code runs a 2M-parameter mechanism model
+      and the carried-state rules. The same code runs a 2M-parameter mechanism model
       and a 21M-parameter language model.
-\item \textbf{Exact chunk invariance for every operator.}
-      The delta rule, slot memory (including its write accumulator), and summary ring
-      (including its partial-chunk accumulator) are carried in the state. A gate splits a
+\item \textbf{A carried-state chunking contract.}
+      The delta rule, slot memory (including its write accumulator), summary ring (including its
+      partial-chunk accumulator), and window ring are carried in the state. A gate splits a
       sequence at position 50---inside a 64-token slot block and a 32-token summary block---and
-      matches the full forward to $1.6\times10^{-6}$ (\Cref{tab:gates}).
+      matches the full forward to $1.6\times10^{-6}$ for the tested configuration
+      (\Cref{tab:gates}).
 \item \textbf{A multiscale decay spectrum.}
       Each delta-rule head starts at its own log-spaced rate. With the spectrum frozen, recall
       at distances $\geq256$ is $1.000$, versus $0.297$ for a single frozen rate
@@ -64,11 +67,14 @@ prominence as the positive ones.
       match-confidence gate turn a diffuse softmax average into an address. Presence recall
       moves from chance to $0.977/1.000/0.953$ over three seeds, and zeroing the memory now
       costs $+2.26$ nats instead of $+0.15$ (\Cref{sec:results-gap-d}).
-\item \textbf{No-regression controls.}
-      The gated read leaves MQAR ($0.990/0.987$ vs.\ $0.988/0.979$), aggregate recall, and a
-      real-data next-token loss ($3.0826$ vs.\ $3.0760$ nats) within seed noise.
+\item \textbf{No-regression checks with mixed outcomes reported.}
+      The gated read leaves MQAR close to the previous arm ($0.990/0.987$ vs.\ $0.988/0.979$).
+      Aggregate recall and the single paired language-model check are reported without claiming
+      an improvement; one aggregate seed is lower and validation CE changes from $3.0760$ to
+      $3.0826$ nats.
 \item \textbf{An honest capability map.}
-      A 21M model writes coherent TinyStories prose (held-out PPL $3.498$), while state
+      A 21M model produces locally coherent, on-genre TinyStories samples (held-out PPL
+      $3.498$), while state
       expansion, chunk-summary benefit, and 256K-context training remain unproven at this
       scale (\Cref{tab:claims}).
 \end{enumerate}

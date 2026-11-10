@@ -2,7 +2,8 @@
 
 This is the one operator in the stack that can store and retrieve key->value bindings, which is what
 separates a workable non-attention model from a plain recurrent one. It is *not* attention: there is
-no ``[T, T]`` score matrix and cost is linear in the sequence length.
+no ``[T, T]`` score matrix; with the configured chunk size fixed, the chunkwise implementation
+has linear growth in processed sequence length.
 
 Recurrence, per head, with ``a_t = exp(g_t)`` and ``b_t = sigmoid(beta_t)``::
 

@@ -1,8 +1,8 @@
 """Bounded slot memory — the long-range ``M_t`` of the Sigma state.
 
-The delta rule forgets on a timescale set by its decay spectrum; the slot memory is the
-unbounded-horizon path. A fixed number of differentiable slots hold prototypes of the keys the
-stream has seen and the values written to them.
+The delta rule forgets on a timescale set by its decay spectrum; the slot memory is a
+long-horizon prototype path. A fixed number of differentiable slots hold prototypes of the keys
+the stream has seen and the values written to them.
 
 Writes are per token (Gap D): every position produces a novelty score (distance to the closest
 prototype), an evidence score (a learned confidence from the token and the residual stream) and a
@@ -31,12 +31,11 @@ accumulators are consolidated into a bounded soft update::
     K_j   <- normalize((1 - eta_j) K_j + eta_j normalize(mean_k))
     use_j <- (1 - eta_j) use_j + eta_j
 
-``eta`` is the Bayesian weight of ``D_j`` pseudo-observations, so a single confident token moves a
+eta is the Bayesian weight of D_j pseudo-observations, so a single confident token moves a
 slot a little and a full block of agreeing tokens replaces it almost entirely. The accumulator, the
-token counter and the ring state are all carried in :class:`SlotMemoryState`, so processing a
-stream in one call or in arbitrary chunks produces bit-comparable results — the defect of the
-previous chunk-mean write, which made the operator depend on chunk boundaries (and re-read stale
-slots for thousands of tokens).
+token counter and the ring state are all carried in SlotMemoryState; this is the state-carrying
+condition used by the paper's split-equivalence gate. The current gate covers one split, not every
+possible chunk boundary, length, or backend.
 
 Cost is ``O(T * slots * width)``: linear in the sequence, constant in memory.
 """
@@ -80,7 +79,8 @@ class SlotMemory(nn.Module):
         self.shrinkage = shrinkage
         # Dead-zone on the write gate. A token below the floor has novelty rescaled to exactly 0,
         # so repeated filler cannot accumulate pseudo-observations across blocks and overwrite the
-        # symbols it surrounds. The gradient is zero below the floor and unchanged above it.
+        # symbols it surrounds. The gradient is zero below the floor; above it, novelty is
+        # linearly rescaled by 1 - novelty_floor before the evidence gate.
         self.novelty_floor = novelty_floor
         # The read has its own temperature: routing wants a sharp assignment, but a read that is
         # sharp before the addresses are trained selects an arbitrary slot.

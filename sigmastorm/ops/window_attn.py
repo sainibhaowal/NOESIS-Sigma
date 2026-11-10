@@ -1,9 +1,11 @@
-"""Sliding-window causal attention — the optional ``d_select`` interaction.
+"""Sliding-window causal attention — the optional local-copying interaction.
 
-Included on a minority of blocks (default 1 in 4) because precise local copying (induction heads) is
-the one thing recurrence is reliably bad at. Its cost is ``O(T * window)`` and its state is a fixed
-ring of keys and values, so it does not make the model a transformer: there is no full-sequence
-attention, no KV growth with context, and it occupies a quarter of the layers.
+Included on a minority of blocks (default 1 in 4) because precise local copying (induction heads)
+is a useful complement to recurrence. Its state is a fixed ring of keys and values, so it does
+not make the model a transformer: there is no full-sequence attention and no KV growth with
+context. The current implementation also materialises a batch/head mask over each input chunk;
+the usual ``O(T * window)`` expression is therefore an architectural intent for bounded chunks,
+not a guarantee for arbitrarily large unchunked calls.
 
 ``WindowAttention`` is a single component of the stack. Removing it entirely is a config switch
 (``local_attn_every = 0``); the rest of the model is unaffected.

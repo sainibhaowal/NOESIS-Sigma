@@ -37,20 +37,22 @@ tokenizer is an 8K byte-level BPE, so the reported perplexity is not comparable 
 computed with larger subword vocabularies.
 
 \paragraph{Long context.}
-Every operator is chunk-invariant and the state is constant in $T$, but the largest trained run
-used 1{,}024-token windows with a differentiable horizon of $4\times256$ tokens in the reported
-configuration. The 256K design target has not been trained or evaluated. Specifically unmeasured:
-retrieval over tens of thousands of tokens, stability of the energy-controlled latent over long
-streams, the interaction between the summary ring and the delta state at scale, and the quality
-of generation after chunked prefill. The chunk-invariance proof is a statement about
-implementation correctness, not about learned long-context ability.
+The carried-state implementation is designed to be independent of caller chunk boundaries, and
+the state is constant in $T$ for a fixed configuration; the reported equivalence gate covers one
+split only. The largest trained run used 1{,}024-token windows with a differentiable horizon of
+$4\times256$ tokens in the reported configuration. The 256K design target has not been trained
+or evaluated. Specifically unmeasured: retrieval over tens of thousands of tokens, stability of
+the energy-controlled latent over long streams, the interaction of the summary ring and the
+delta state at scale, and the quality of generation after chunked prefill. The chunking result
+is an implementation check, not a learned long-context capability result.
 
 \paragraph{Efficiency measurements.}
 The cost table reports CPU forward times with two threads and batch size one. Those numbers
 measure dense PyTorch implementations without fused kernels for the chunkwise delta solve, the
-slot consolidation, or the summary scan. They are useful as a relative sanity check and as
-evidence that the operators are linear in $T$; they are not deployment throughput and they do
-not constitute a fair efficiency comparison against optimized attention kernels.
+slot consolidation, or the summary scan. They are useful as a relative sanity check over the
+tested lengths; they do not establish asymptotic runtime for every operator, deployment
+throughput, or a fair efficiency comparison against optimized attention kernels. In particular,
+the current window-attention path materialises a mask over each input chunk.
 
 \paragraph{Hardware and reruns.}
 The 21M language-model run used two 16\,GB T4 GPUs. The mechanism and Gap~D experiments were
@@ -61,9 +63,19 @@ result is a gap in the engineering evidence, not just in the science.
 
 \paragraph{Evaluation breadth.}
 There are no downstream benchmarks, no zero-shot evaluations, no instruction tuning, and no
-human evaluation. The 21M model is a prototype that writes on-genre prose; it is not evaluated
-as an assistant. Claims about usefulness, safety, or alignment are outside the scope of this
-report and are not made.
+human evaluation. The 21M model is a prototype that produces the recorded on-genre samples; it
+is not evaluated as an assistant. Claims about usefulness, safety, or alignment are outside the
+scope of this report and are not made.
+
+\paragraph{Post-training and fine-tuning scope.}
+The repository currently supports language-model training, checkpoint resume, evaluation, and
+generation. It does not implement instruction supervised fine-tuning, chat-template handling,
+assistant-span loss masking, preference optimisation such as DPO or RLHF, LoRA/adapters,
+quantisation, serving, or a safety-evaluation suite. Those are future protocols, not hidden
+capabilities of the current checkpoint. A valid follow-up would define the data format and
+special tokens, start from a checkpoint with its saved architecture configuration, reserve a
+held-out instruction set, compare pre- and post-tuning loss and task scores, and report safety
+and regression evaluations separately.
 
 \paragraph{Known negative and unstable results.}
 State expansion reduced accuracy at 66 bindings, and the summary benefit changed sign between

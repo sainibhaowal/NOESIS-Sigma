@@ -3,6 +3,8 @@
 LaTeX source for *SigmaStorm: Bounded-State Sequence Modeling without Dense Token-to-Token
 Attention*.
 
+**Author:** Ravinder Singh
+
 ## Build
 
 ```bash

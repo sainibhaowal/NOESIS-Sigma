@@ -64,8 +64,9 @@ The Gap~D switches are opt-in and default to the previous behaviour:
 \texttt{memory\_novelty\_floor} $=0$, \texttt{memory\_read\_temperature} $=$ \texttt{None}, and
 \texttt{memory\_abstain} $=$ false. The shipped gated configuration sets a positive novelty
 floor, a read temperature separate from the routing temperature, and
-\texttt{memory\_abstain} $=$ true. Existing checkpoints load unchanged because the defaults
-reproduce the old operator.
+\texttt{memory\_abstain} $=$ true. The defaults reproduce the old operator, but checkpoint
+compatibility should be checked against each saved architecture configuration rather than
+assumed for arbitrary historical artifacts.
 
 \section{Reproduction}
 \label{app:repro}
@@ -80,9 +81,9 @@ cited.
 .venv/bin/python scripts/gate.py
 .venv/bin/python -m pytest -q tests
 .venv/bin/python scripts/ladder.py \
-    --out results/ladder.json
+    --out_dir results
 .venv/bin/python scripts/gapd_proof.py \
-    --out results/gapd_proof.json
+    --out_dir results
 \end{verbatim}
 }
 

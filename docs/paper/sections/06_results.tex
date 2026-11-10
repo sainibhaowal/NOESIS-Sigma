@@ -234,11 +234,12 @@ including context noise.
 \paragraph{No-regression controls.}
 The gated mechanism must not break the paths it does not target. \Cref{tab:regression} shows
 MQAR (delta-rule path), aggregate recall (summary path), and a 600-step real-data next-token
-comparison on the tiny preset. MQAR is unchanged to within seed noise, and is slightly higher
-for the gated arm ($+0.002$ and $+0.008$). The aggregate task is seed-noisy but the gated arm
-is above the previous behaviour on both seeds. Real-data language modeling moves val CE from
-$3.0760$ to $3.0826$ nats, a $0.2\%$ difference inside the run-to-run spread; the training
-curves overlap throughout (\Cref{fig:lm-check}).
+comparison on the tiny preset. MQAR is slightly higher for the gated arm ($+0.002$ and
+$+0.008$), but this is only two seeds. Aggregate recall is mixed: the gated arm is higher on
+seed 0 ($0.836$ vs.\ $0.680$) and lower on seed 1 ($0.859$ vs.\ $1.000$). The single paired
+language-model check moves validation CE from $3.0760$ to $3.0826$ nats; without repeated
+runs, this does not establish a regression or an improvement. The plotted training curves are
+similar over the recorded steps (\Cref{fig:lm-check}).
 
 \begin{table}[t]
 \centering
@@ -276,8 +277,9 @@ LM PPL & 21.67 & 21.82 \\
 \legend{baseline, gated}
 \end{axis}
 \end{tikzpicture}
-\caption{Real TinyStories next-token training, identical stream. The gated slot read does not
-change the loss trajectory. Held-out CE is $3.0760$ (baseline) vs.\ $3.0826$ (gated).}
+\caption{Real TinyStories next-token training on an identical stream. The two recorded loss
+trajectories are similar over 600 steps; this single paired run does not provide uncertainty.
+Held-out CE is $3.0760$ (baseline) vs.\ $3.0826$ (gated).}
 \label{fig:lm-check}
 \end{figure}
 
@@ -406,8 +408,9 @@ tiny $T{=}2048$ & 2.08M & 0.411 & 0.68M & 0.1404 \\
 \end{axis}
 \end{tikzpicture}
 \caption{Forward cost of the 21M configuration and the width-matched transformer control on
-CPU. Both are linear in $T$, but SigmaStorm's operators cost more per token at this
-implementation. The relative gap is an engineering problem, not a property of the
-architecture.}
+CPU. The three tested points are approximately linear on this log--log plot, but this does not
+establish an asymptotic guarantee for the dense implementation. SigmaStorm's operators cost more
+per token in this measurement; the relative gap is an engineering problem, not a property of the
+architecture alone.}
 \label{fig:cost}
 \end{figure}
